@@ -36,7 +36,6 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EventMonitor.rc" />
-    <ClCompile Include="EventMonitor.c" />
     <Inf Include="EventMonitor.inf" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -64,7 +63,8 @@
     <DriverType>WDM</DriverType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <TargetVersion>Windows10</TargetVersion>
+    <TargetVersion>
+    </TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>Driver</ConfigurationType>
@@ -121,6 +121,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <SourcePath>C:\Users\lasca\Source\Repos\2017-marcus-alexandre\EventMonitor\EventMonitor\src;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
@@ -179,6 +180,18 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\config.h" />
+    <ClInclude Include="src\dbg\debug.h" />
+    <ClInclude Include="src\dvc\device.h" />
+    <ClInclude Include="src\io\IO.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\dbg\debug.c" />
+    <ClCompile Include="src\dvc\device.c" />
+    <ClCompile Include="src\EventMonitor.c" />
+    <ClCompile Include="src\io\IO.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
