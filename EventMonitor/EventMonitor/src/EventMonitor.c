@@ -90,8 +90,7 @@ Return Value:
 
     UNREFERENCED_PARAMETER( RegistryPath );
 
-    PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
-                  ("EventMonitor!DriverEntry: Entered\n") );
+	debug("DriverEntry: Entered");
 
 	DriverObject->DriverUnload = EventMonitorUnload;
 
