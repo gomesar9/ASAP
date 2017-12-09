@@ -13,10 +13,13 @@
 /* Write data from the userland to driver stack */
 NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
+	debug("IO::Write : Entered");
 	//TBTS_BUFFER bdata;
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
-	UINT32 _datasize, sizerequired= 0;
+	UINT32 datasize, sizerequired= 0;
+	//char *entry = NULL;
+	char entry[64];
 	NTSTATUS NtStatus = STATUS_SUCCESS;
 	UNREFERENCED_PARAMETER(DeviceObject);
 	NtStatus = STATUS_SUCCESS;
@@ -24,11 +27,23 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
 
 	userbuffer = Irp->AssociatedIrp.SystemBuffer;
-	_datasize = PIO_STACK_IRP->Parameters.Write.Length;
+	datasize = PIO_STACK_IRP->Parameters.Write.Length;
 	/* Reading */
-	debug("Reading user data");
-	//char entry[] = malloc ?
-	//memcpy(userbuffer, &entry, sizerequired);
+	
+	//entry = malloc((int) (datasize));
+	if (datasize < 64){
+		memcpy(entry, userbuffer, datasize);
+		Irp->IoStatus.Status = NtStatus;
+		//Irp->IoStatus.Information = sizerequired;
+	}
+	else {
+		memcpy(entry, userbuffer, 64);
+	}
+	
+	char msgn[128];
+	sprintf(msgn, "Texto recebido: %s", entry);
+	debug(msgn);
+	//memcpy(entry, userbuffer, sizerequired);
 	
 	Irp->IoStatus.Status = NtStatus;
 	Irp->IoStatus.Information = sizerequired;
@@ -43,6 +58,7 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 /* Write data from driver to the userland stack */
 NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
+	debug("IO::Read : Entered");
 	//TBTS_BUFFER bdata;
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
@@ -50,13 +66,14 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	NTSTATUS NtStatus = STATUS_SUCCESS;
 	UNREFERENCED_PARAMETER(DeviceObject);
 	NtStatus = STATUS_SUCCESS;
-
+	
 	userbuffer = Irp->AssociatedIrp.SystemBuffer;
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
 
 	/* Greatings */
-	char hello[6] = "Hello";
-	sizerequired = sizeof(hello);
+	char hello[] = "Hello";
+	//sizerequired = sizeof(hello);
+	sizerequired = 6;
 	datasize = PIO_STACK_IRP->Parameters.Read.Length;
 
 	if (datasize >= sizerequired) {
@@ -70,11 +87,9 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 		Irp->IoStatus.Information = 0;
 	}
 
-
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
 	return NtStatus;
-
 }
 
 /* Create File -- start capture mechanism */
