@@ -47,7 +47,7 @@ NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject)
 	/* registering specific I/O routines */
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = Create;
 	DriverObject->MajorFunction[IRP_MJ_READ] = Read;
-	//DriverObject->MajorFunction[IRP_MJ_WRITE] = Write;
+	DriverObject->MajorFunction[IRP_MJ_WRITE] = Write;
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = Close;
 
 	dev->Flags |= DO_BUFFERED_IO;

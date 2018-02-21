@@ -1,8 +1,8 @@
 import subprocess
 
-DRIVERNAME = "EventMonitor"
-INFO_PATH = "C:\\Users\\lasca\\Source\\Repos\\2017-marcus-alexandre\\EventMonitor\\x64\\Debug\\EventMonitor.inf"
-
+DRIVERNAME = "EventMonitor10"
+INFO_PATH = "C:\\Users\\lasca\\Source\\Repos\\2017-marcus-alexandre\\EventMonitor\\x64\\Debug\\EventMonitor10.inf"
+#C:\Users\lasca\Source\Repos\2017-marcus-alexandre\EventMonitor\x64\Debug\EventMonitor10\eventmonitor10.cat
 def event_monitor(action="start"):
     '''
         event_monitor function handles the EventMonitor driver.

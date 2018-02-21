@@ -69,9 +69,9 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	
 	userbuffer = Irp->AssociatedIrp.SystemBuffer;
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
-
-	/* Greatings */
-	char hello[] = "Hello";
+	
+	/* Greetings */
+	char hello[] = "lkjji\0\n\r";
 	//sizerequired = sizeof(hello);
 	sizerequired = 6;
 	datasize = PIO_STACK_IRP->Parameters.Read.Length;
