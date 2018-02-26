@@ -37,17 +37,16 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 		//Irp->IoStatus.Information = sizerequired;
 	}
 	else {
-		memcpy(entry, userbuffer, 64);
+		memcpy(entry, userbuffer, 63);
+		Irp->IoStatus.Status = NtStatus;
 	}
-	
-	char msgn[128];
-	sprintf(msgn, "Texto recebido: %s", entry);
-	debug(msgn);
+	char msg[64];
+	sprintf(msg, "IO: msg received: %s", entry);
+	debug(msg);
 	//memcpy(entry, userbuffer, sizerequired);
 	
 	Irp->IoStatus.Status = NtStatus;
 	Irp->IoStatus.Information = sizerequired;
-
 
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
@@ -71,7 +70,7 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
 	
 	/* Greetings */
-	char hello[] = "lkjji\0\n\r";
+	char hello[] = "Hello\n\r";
 	//sizerequired = sizeof(hello);
 	sizerequired = 6;
 	datasize = PIO_STACK_IRP->Parameters.Read.Length;
@@ -106,9 +105,9 @@ NTSTATUS Create(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 	/* Launch setup threads */
 	//control_thread(LOAD_BTS, BTS_CORE);
-
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
 	status = STATUS_SUCCESS;
 	return status;
 }
