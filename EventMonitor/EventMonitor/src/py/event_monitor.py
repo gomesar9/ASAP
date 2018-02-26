@@ -110,6 +110,7 @@ class Test():
             msg = "Hello"
             print("[:] Enviando msg: '" + msg + "'")
             drvw.write(msg)
+            drvw.flush()
 
             if self.verbose:
                 print("[V] Fechando conexão.")
@@ -123,8 +124,8 @@ class Test():
             drvr = open(self.DRIVER_NAME, 'r')
             
             if self.verbose:
-                print("[V] Lendo mensagem.")
-            msg = drvr.read()
+                print("[V] Lendo mensagem (6 bytes)")
+            msg = drvr.read(6)
             if msg:
                 print("[:] Msg recebida: " + msg)
             else:
