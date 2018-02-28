@@ -17,6 +17,7 @@ Environment:
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 #include "dvc/device.h"
+#include "bfr/buffer.h"
 
 PFLT_FILTER gFilterHandle;
 ULONG_PTR OperationStatusCtx = 1;
@@ -125,6 +126,11 @@ Return Value:
         //    FltUnregisterFilter( gFilterHandle );
         //}
     //}
+
+	/* create simply buffer */
+	if (bfr_create() == 0) {
+		debug("Buffer created.");
+	}
 	debug("Entry Point: Out");
 
     return status;
@@ -166,6 +172,8 @@ Return Value:
 	IoDeleteSymbolicLink(&path);
 	IoDeleteDevice(DriverObject->DeviceObject);
 
+	debug("Destroying BFR");
+	bfr_destroy();
     //FltUnregisterFilter( gFilterHandle );
 
     return STATUS_SUCCESS;
