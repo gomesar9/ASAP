@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+
+import win32file as w # Use Windows API
 import subprocess
 import time
 
@@ -84,95 +87,101 @@ class EventMonitor():
         return self.__doScAction(action)
 
 
-class Test():
-    """docstring for Test"""
-    def __init__(self, verbose=False):
-        self.verbose = verbose
+class Client():
+    def __init__(self, debug=False):
+        self.debug = debug
         self.DRIVER_NAME = "\\\\.\\EventMonitor"
+        self.hdvc = None
 
+        self.__setup()
+
+
+    def __setup(self):
+        _desiredAccess = w.GENERIC_READ|w.GENERIC_WRITE  # READ/WRITE/EXECUTE
+        _shareMode = 0  # Not shared
+        _attributes = None
+        _creationDisposition = w.OPEN_EXISTING
+        _flagsAndAttributes = 0x00000080  # @Marcus's Magic
+        _hTemplateFile = None
+
+        self.hdvc = w.CreateFile(
+                self.DRIVER_NAME, 
+                _desiredAccess,
+                _shareMode,
+                _attributes,
+                _creationDisposition,
+                _flagsAndAttributes,
+                _hTemplateFile
+                )
+        
+        #time.sleep(1)
     
-    def run(self, opt='wr'):
-        '''
-            params:
-                opt: 'w'|'r'|'wr'|
-                    w - write test
-                    r - read test
-
+    
+    def write(self, text):
         '''
 
-        if 'w' in opt:
-            if self.verbose:
-                print("[V] Conectando ao driver em modo de escrita.")
-            drvw = open(self.DRIVER_NAME, 'w')
-            
-            if self.verbose:
-                print("[V] Enviando mensagem.")
-            msg = "Hello"
-            print("[:] Enviando msg: '" + msg + "'")
-            drvw.write(msg)
-            drvw.flush()
+            https://docs.activestate.com/activepython/3.2/pywin32/win32file__WriteFile_meth.html
+        '''
+        errCod, nBytesWritten = w.WriteFile(self.hdvc, text.encode(), None)
+        if self.debug:
+            print("[D]send: errCod({}), nBytesWritten({}).".format(
+                errCod, nBytesWritten
+                ))
 
-            if self.verbose:
-                print("[V] Fechando conexão.")
-            time.sleep(1)
-            drvw.close()
-            time.sleep(1)
-
-        if 'r' in opt:
-            if self.verbose:
-                print("[V] Conectando ao driver em modo de leitura.")
-            drvr = open(self.DRIVER_NAME, 'r')
-            
-            if self.verbose:
-                print("[V] Lendo mensagem (6 bytes)")
-            msg = drvr.read(6)
-            if msg:
-                print("[:] Msg recebida: " + msg)
-            else:
-                print("[:] Msg não recebida/vazia.")
-
-            if self.verbose:
-                print("[V] Fechando conexão.")
-            time.sleep(1)
-            drvr.close()
+        if errCod != 0:
+            print("Error: " + errCod)
+            return False
+        else:
+            return True
 
 
-def doPipeline(verbose=False, debug=False):
-    '''
-        params:
-            verbose: True|False
-            debug: True|False
+    def read(self):
+        '''
 
-        Step01: install driver, start driver
-        Step02: run 'write' and 'read' test
-        Step03: stop driver
-    '''
+            hr may be 0, ERROR_MORE_DATA or ERROR_IO_PENDING
+            https://docs.activestate.com/activepython/3.2/pywin32/win32file__ReadFile_meth.html
+        '''
+        hr, string = w.ReadFile(self.hdvc, 128, None)
 
-    em = EventMonitor(verbose=verbose, debug=debug)
-    tt = Test(verbose=verbose)
+        if hr != 0:
+            print("Error: " + hr)
+            return False, ''
+        else:
+            return True, string
 
-    # -- Step01
-    if verbose:
-        print("[V] Pipeline #Step01.")
-    em.install()
-    time.sleep(2)
-    em.start()
 
-    # -- Step02
-    if verbose:
-        print("[V] Pipeline #Step02.")
-    time.sleep(2)
-    tt.run()
+    def close(self):
+        w.CloseHandle(self.hdvc)
+        if self.debug:
+            print("EMClient closed.")
 
-    # -- Step03
-    if verbose:
-        print("[V] Pipeline #Step03.")
-    time.sleep(2)
-    em.stop()
+
+    def __del__(self):
+        print("Garbage __del__")
+        self.close()
+
+
+def em_help():
+    helptxt = "# em = EventMonitor(debug=True) # EventMonitor was created."
+    helptxt += "\n# Use:"
+    helptxt += "\nem.install()"
+    helptxt += "\nem.start()"
+    helptxt += "\n# Creating Client:"
+    helptxt += "\nc = Client(verbose=True)"
+    helptxt += "\n# And test:"
+    helptxt += "\nc.write('some text')"
+    helptxt += "\nc.read()"
+    helptxt += "\n# Close Client in the end"
+    helptxt += "\nc.close()"
+    helptxt += "\n# Stop driver:"
+    helptxt += "\nem.stop()"
+
+    print(helptxt)
 
 
 if __name__ == "__main__":
     em = EventMonitor(debug=True)
-    tt = Test(verbose=True)
+    #c = Client(debug=True)
+    print("For help:\n\t>em_help()")
     
     
