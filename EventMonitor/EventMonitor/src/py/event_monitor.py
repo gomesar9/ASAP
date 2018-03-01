@@ -147,7 +147,12 @@ class Client():
             print("Error: " + hr)
             return False, ''
         else:
-            return True, string
+            try:
+                string = string.decode()
+                return True, string
+            except Exception as e:
+                print("[!] Erro: " e.msg)
+                return False, ''
 
 
     def close(self):
