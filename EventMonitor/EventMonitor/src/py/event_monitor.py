@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import win32file as w # Use Windows API
+import configparser
 import subprocess
 import time
 
@@ -12,22 +13,33 @@ class EventMonitor():
         self.verbose = verbose
         self.debug = debug
 
-        # Hard coded
-        self.__DRIVER_NAME = "EventMonitor10"
-        #self.__INF_PATH = "C:\\Users\\lasca\\Source\\Repos\\2017-marcus-alexandre\\EventMonitor\\EventMonitor\\x64\\Debug\\EventMonitor10.inf"
-        self.__INF_PATH = EventMonitor.getPath()
+        # Configuration
+        self.__driver_name = None
+        self.__inf_path = None
+        self.__configure()
 
-    def getPath():
+
+    def __configure(self, cfg_file="project.cfg"):
+        cfgp = configparser.ConfigParser()
+        _ = cfgp.read(cfg_file)
+
         path_to_inf = ''
-        with open('inf_path.txt') as f:
-            path_to_inf = f.read().splitlines()[0]
+        try:
+            self.__inf_path = cfgp.get("driver", "inf_path")
+            self.__driver_name = cfgp.get("driver", "name")
 
-        return path_to_inf
+            if self.verbose:
+                print("[V] Driver configuration [OK].")
+        except Exception as e:
+            print("[!] Erro: " + str(e))
+            return False
+
+        return True
 
 
     def __doSetupAction(self, action):
         cmd = "RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection {ACT} 132 {INF}"
-        cmd = cmd.format(ACT=action, INF=self.__INF_PATH)
+        cmd = cmd.format(ACT=action, INF=self.__inf_path)
 
         if self.debug:
             print("[D] __doSetupAction")
@@ -35,15 +47,19 @@ class EventMonitor():
 
         try:
             subprocess.check_call( cmd, shell=True )
-            return True
+            
+            if self.verbose:
+                print("[V] Driver setup [OK].")
         except Exception as e:
             print("[!] Error:\n" + e.message)
             return False
 
+        return True
+
 
     def __doScAction(self, action):
         cmd = "sc {ACT} {DRIVER}"
-        cmd = cmd.format(ACT=action, DRIVER=self.__DRIVER_NAME)
+        cmd = cmd.format(ACT=action, DRIVER=self.__driver_name)
 
         if self.debug:
             print("[D] __doScAction")
@@ -90,13 +106,34 @@ class EventMonitor():
 class Client():
     def __init__(self, debug=False):
         self.debug = debug
-        self.DRIVER_NAME = "\\\\.\\EventMonitor"
         self.hdvc = None
 
-        self.__setup()
+        # Configure
+        self.__driver_name = None
+        self.__configure()
+
+        # Connect
+        #self.__connect()
+
+    
+    def __configure(self, cfg_file="project.cfg"):
+        cfgp = configparser.ConfigParser()
+        cfgp.read(cfg_file)
+
+        try:
+            self.__driver_name = cfgp.get("device", "path")
+
+            if self.debug:
+                print("[D] Client configure [OK].")
+        except Exception as e:
+            print("[!] Error: " + str(e))
+
+            return False
+
+        return True
 
 
-    def __setup(self):
+    def connect(self):
         _desiredAccess = w.GENERIC_READ|w.GENERIC_WRITE  # READ/WRITE/EXECUTE
         _shareMode = 0  # Not shared
         _attributes = None
@@ -104,8 +141,21 @@ class Client():
         _flagsAndAttributes = 0x00000080  # @Marcus's Magic
         _hTemplateFile = None
 
+        if self.debug:
+            cmd = "w.CreateFile({}, {}, {}, {}, {}, {}, {})".format(
+                self.__driver_name, 
+                _desiredAccess,
+                _shareMode,
+                _attributes,
+                _creationDisposition,
+                _flagsAndAttributes,
+                _hTemplateFile
+                )
+
+            print("[D] Connect:\n\t" + cmd)
+
         self.hdvc = w.CreateFile(
-                self.DRIVER_NAME, 
+                self.__driver_name, 
                 _desiredAccess,
                 _shareMode,
                 _attributes,
@@ -122,9 +172,13 @@ class Client():
 
             https://docs.activestate.com/activepython/3.2/pywin32/win32file__WriteFile_meth.html
         '''
+        if self.hdvc == None:
+            print("Client not connected.")
+            return False
+
         errCod, nBytesWritten = w.WriteFile(self.hdvc, text.encode(), None)
         if self.debug:
-            print("[D]send: errCod({}), nBytesWritten({}).".format(
+            print("[D] Send: errCod({}), nBytesWritten({}).".format(
                 errCod, nBytesWritten
                 ))
 
@@ -141,6 +195,10 @@ class Client():
             hr may be 0, ERROR_MORE_DATA or ERROR_IO_PENDING
             https://docs.activestate.com/activepython/3.2/pywin32/win32file__ReadFile_meth.html
         '''
+        if self.hdvc == None:
+            print("Client not connected.")
+            return False
+
         hr, string = w.ReadFile(self.hdvc, 128, None)
 
         if hr != 0:
@@ -151,7 +209,7 @@ class Client():
                 string = string.decode()
                 return True, string
             except Exception as e:
-                print("[!] Erro: " e.msg)
+                print("[!] Erro: " + str(e))
                 return False, ''
 
 
@@ -167,12 +225,14 @@ class Client():
 
 
 def em_help():
-    helptxt = "# em = EventMonitor(debug=True) # EventMonitor was created."
+    helptxt =  "# EventMonitor and Client have already been created."
+    helptxt += "\n# em = EventMonitor(debug=True)"
+    helptxt += "\n# c = Client(debug=True)"
     helptxt += "\n# Use:"
     helptxt += "\nem.install()"
     helptxt += "\nem.start()"
-    helptxt += "\n# Creating Client:"
-    helptxt += "\nc = Client(verbose=True)"
+    helptxt += "\n# Connecting Client:"
+    helptxt += "\nc.connect()"
     helptxt += "\n# And test:"
     helptxt += "\nc.write('some text')"
     helptxt += "\nc.read()"
@@ -186,7 +246,8 @@ def em_help():
 
 if __name__ == "__main__":
     em = EventMonitor(debug=True)
-    #c = Client(debug=True)
+    c = Client(debug=True)
+
     print("For help:\n\t>em_help()")
     
     
