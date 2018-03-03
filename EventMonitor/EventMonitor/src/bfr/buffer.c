@@ -1,14 +1,17 @@
 #include "buffer.h"
 
-
 #define BFR_SIZE 64
 
-char BFR[64];
-const unsigned BFR_BYTE_SIZE = (unsigned)BFR_SIZE * sizeof(char);
+//char BFR[64];
+char *BFR;
+//const unsigned BFR_BYTE_SIZE = (unsigned) BFR_SIZE * sizeof(char);
+size_t BFR_BYTE_SIZE = (unsigned)BFR_SIZE * sizeof(char);
+
 
 int bfr_create() {
 	//BFR = malloc(BFR_BYTE_SIZE);
 	//memset(BFR, '\0', BFR_BYTE_SIZE);
+	BFR = ExAllocatePoolWithTag(NonPagedPoolNx, BFR_BYTE_SIZE, 'RFB');
 
 	return 0;
 }
@@ -38,6 +41,7 @@ int bfr_get(char msg[64]) {
 
 int bfr_destroy() {
 	//free(BFR);
+	ExFreePoolWithTag(BFR, 'RFB');
 
 	return 0;
 }
