@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import win32file as w # Use Windows API
@@ -51,7 +52,7 @@ class EventMonitor():
             if self.verbose:
                 print("[V] Driver setup [OK].")
         except Exception as e:
-            print("[!] Error:\n" + e.message)
+            print("[!] Error:\n" + str(e) )
             return False
 
         return True
@@ -244,10 +245,139 @@ def em_help():
     print(helptxt)
 
 
-if __name__ == "__main__":
-    em = EventMonitor(debug=True)
-    c = Client(debug=True)
+class EMShell():
+    """Shell for Event Monitor"""
 
-    print("For help:\n\t>em_help()")
+
+    def __init__(self, config_file='project.cfg', debug=True):
+        self.debug = debug
+        self.tmp = config_file
+        self.em = EventMonitor(verbose=True)
+        self.cl = Client(debug=True)
+        self.__cmds = {
+                "install": self.__install,
+                "start": self.__start,
+                "stop": self.__stop,
+                "interrogate": self.__interrogate,
+                "read": self.__read,
+                "write": self.__i_write,
+                "?": self.__help
+                }
+        self.__cl_connected = False
+        self.__em_started = False
+
+
+    def __print(self, txt):
+        print("[EMS] " + txt)
+
+
+    def __help(self):
+        h = "Commands: install, start, stop, interrogate, read, write"
+        h+= "\nIt is not necessary to run connect before write/read."
+
+        self.__print(h)
+
+
+    def __install(self):
+        if self.__cl_connected:
+            self.__disconnect()
+
+        if self.__em_started:
+            self.__stop()
+
+        self.__print("Installing driver.")
+        self.em.install()
+
+
+    def __start(self):
+        if self.__em_started:
+            self.__print("Driver already started.")
+        else:
+            self.__print("Starting driver.")
+            self.em.start()
+            self.__em_started = True
+
+
+    def __stop(self):
+        if not self.__em_started:
+            self.__print("Driver has not started.")
+        else:
+            self.__print("Stopping driver.")
+            self.em.stop()
+            self.__em_started = False
+
+
+    def __interrogate(self):
+        if not self.__em_started:
+            self.__start()
+        self.em.interrogate()
+
     
+    def __connect(self):
+        if not self.__em_started:
+            self.__print("Starting driver.")
+            self.__start()
+    
+        time.sleep(5)
+        self.__print("Connecting client.")
+        self.cl.connect()
+        self.__cl_connected = True
+
+
+    def __disconnect(self):
+        if self.__cl_connected:
+            self.__print("Disconnecting client.")
+            self.cl.close()
+            self.__cl_connected = False
+
+
+    def __i_write(self):
+        if not self.__cl_connected:
+            self.__connect()
+
+        try:
+            msg = input("msg>")
+            self.cl.write(msg)
+        except Exception as e:
+            print(str(e))
+
+
+    def __read(self):
+        if not self.__cl_connected:
+            self.__connect()
+
+        time.sleep(2)
+        _, txt = self.cl.read()
+        print("msg>" + txt)
+
+
+    def menu(self):
+        print("[EventMonitorShell]")
+        print("[V] ? for help")
+        try:
+            cmd = None
+            while cmd != "exit":
+                cmd = input("\n[EMS]> ")
+
+                if cmd in self.__cmds:
+                    if self.debug:
+                        print("CMD({})".format(cmd))
+                    self.__cmds[cmd]()
+
+        except Exception as e:
+            print( str(e) )
+
+        self.cl.close()
+        time.sleep(3)
+        if self.__em_started:
+            self.em.stop()
+
+
+if __name__ == "__main__":
+    #em = EventMonitor(debug=True)
+    #c = Client(debug=True)
+
+    #print("For help:\n\t>em_help()")
+    ems = EMShell()
+    ems.menu()
     
