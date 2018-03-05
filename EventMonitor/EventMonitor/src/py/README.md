@@ -1,10 +1,12 @@
+### Config
+First configure paths inside `EventMonitor\src\py\project.cfg`
+
 ### with IPython:
 
-1. cd to 'src/py' directory
+1. cd to 'EventMonitor\src\py' directory
 2. execute: `%run event_monitor.py`
 
-`em`(EventMonitor) and `tt`(Test) was created:
-use:
+then `em`(EventMonitor) and `c`(Client) are created, use:
 
 ```python
 # EventMonitor methods:
@@ -14,13 +16,12 @@ em.start()
 em.stop()
 em.interrogate()
 
-# Test methods:
-tt.run('w')	# Write test
-tt.run('r') # Read test
-tt.run() # Read and write tests
+# Client methods:
+c.connect()
+c.write(text)
+c.read()
+c.close()
 
-# Pipeline function:
-doPipeline(verbose=True, debug=True) # Will install, start, test, and stop driver.
 
 ```
 
