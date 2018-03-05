@@ -249,7 +249,7 @@ class EMShell():
     """Shell for Event Monitor"""
 
 
-    def __init__(self, config_file='project.cfg', debug=True):
+    def __init__(self, config_file='project.cfg', debug=False):
         self.debug = debug
         self.tmp = config_file
         self.em = EventMonitor(verbose=True)
@@ -315,7 +315,6 @@ class EMShell():
     
     def __connect(self):
         if not self.__em_started:
-            self.__print("Starting driver.")
             self.__start()
     
         time.sleep(5)
@@ -346,7 +345,6 @@ class EMShell():
         if not self.__cl_connected:
             self.__connect()
 
-        time.sleep(2)
         _, txt = self.cl.read()
         print("msg>" + txt)
 
