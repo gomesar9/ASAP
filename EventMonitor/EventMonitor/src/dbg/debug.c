@@ -1,3 +1,9 @@
+/*
+ * Event Monitor
+ * Marcus Botacin
+ * Alexandre R Gomes
+ * 2018
+ */
 #include "../config.h"
 
 
