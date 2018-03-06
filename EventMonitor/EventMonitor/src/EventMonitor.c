@@ -131,7 +131,7 @@ Return Value:
 	if (bfr_create() == 0) {
 		debug("Buffer created.");
 	}
-	debug("Entry Point: Out");
+	//debug("Entry Point: Out");
 
     return status;
 }

@@ -17,7 +17,7 @@ NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject)
 	NTSTATUS status;
 	PDEVICE_OBJECT dev;
 	UNICODE_STRING namestring, linkstring;
-	debug("Creating Device V.0.03");
+	debug("Creating Device V.0.04");
 
 	RtlInitUnicodeString(&namestring, DRIVERNAME);
 	status = IoCreateDevice(DriverObject, 0, &namestring, FILE_DEVICE_DISK_FILE_SYSTEM, FILE_DEVICE_SECURE_OPEN, FALSE, &dev);
@@ -50,10 +50,6 @@ NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject)
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = Close;
 	
 	char msg[256];
-	//sprintf(msg, "IRP_MJ_CREATE: %lu.", IRP_MJ_CREATE);
-
-	dev->Flags |= DO_BUFFERED_IO;
-	sprintf(msg, "dev->Flags: %lu.", dev->Flags);
 	debug(msg);
 
 	return STATUS_SUCCESS;

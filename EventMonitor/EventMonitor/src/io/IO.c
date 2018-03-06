@@ -14,7 +14,7 @@
 /* Write data from the userland to driver stack */
 NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
-	debug("IO::Write : Entered");
+	//debug("IO::Write : Entered");
 	//TBTS_BUFFER bdata;
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
@@ -66,7 +66,7 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 /* Write data from driver to the userland stack */
 NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
-	debug("IO::Read : Entered");
+	//debug("IO::Read : Entered");
 	//TBTS_BUFFER bdata;
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
