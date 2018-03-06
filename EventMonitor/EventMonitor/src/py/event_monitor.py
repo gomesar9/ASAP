@@ -26,7 +26,10 @@ class EventMonitor():
 
         path_to_inf = ''
         try:
-            self.__inf_path = cfgp.get("driver", "inf_path")
+            _project_path = cfgp.get("project", "fpath")
+            _inf_path = cfgp.get("driver", "inf_rpath")
+            self.__inf_path = _project_path + _inf_path
+
             self.__driver_name = cfgp.get("driver", "name")
 
             if self.verbose:
@@ -122,7 +125,7 @@ class Client():
         cfgp.read(cfg_file)
 
         try:
-            self.__driver_name = cfgp.get("device", "path")
+            self.__driver_name = cfgp.get("device", "fpath")
 
             if self.debug:
                 print("[D] Client configure [OK].")
@@ -252,8 +255,8 @@ class EMShell():
     def __init__(self, config_file='project.cfg', debug=False):
         self.debug = debug
         self.tmp = config_file
-        self.em = EventMonitor(verbose=True)
-        self.cl = Client(debug=True)
+        self.em = EventMonitor(verbose=True, debug=True)
+        self.cl = Client(debug=False)
         self.__cmds = {
                 "install": self.__install,
                 "start": self.__start,
@@ -272,8 +275,8 @@ class EMShell():
 
 
     def __help(self):
-        h = "Commands: install, start, stop, interrogate, read, write"
-        h+= "\nIt is not necessary to run connect before write/read."
+        h = "Commands: install, start, stop, interrogate, read, write, exit"
+        h+= "\nIt is not necessary to run 'start' before 'write'/'read', either 'stop' before 'exit'."
 
         self.__print(h)
 
