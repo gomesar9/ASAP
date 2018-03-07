@@ -7,16 +7,17 @@ import time
 
 class ClientEM():
     """docstring for ClientEM"""
-    __VERSION = "V0.01"
+    __VERSION = "V0.02a"
 
 
     def __init__(self, exec_type="simulation", debug=False):
         self.__exec_type = exec_type
 
-        self.__interval = None
-        self.__n_reads = None
         self.__em = None
         self.__driver_fpath = None
+        self.__interval = None
+        self.__n_reads = None
+        self.__read_bytes = 64
         self.__setup_ok = False
 
         self.debug = debug
@@ -67,7 +68,7 @@ class ClientEM():
 
             self.__driver_fpath = cfgp.get("EventMonitor", "fpath")
             self.__interval = float( cfgp.get(self.__exec_type, "interval") )
-            self.__n_reads = cfgp.get(self.__exec_type, "n_reads")
+            self.__n_reads = int( cfgp.get(self.__exec_type, "n_reads") )
 
             return self.__connect_to_event_monitor()
         except Exception as e:
@@ -105,4 +106,8 @@ class ClientEM():
 
 if __name__ == "__main__":
      print("Client for EventMonitor ({ver}).".format(ver=ClientEM._ClientEM__VERSION))
+     print("Use:\n c = ClientEM(debug=True)")
+     print(" c.start()")
+     print("# Results in c.last_run_data")
+
 
