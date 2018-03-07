@@ -11,11 +11,13 @@ class ClientEM():
 
 
     def __init__(self, exec_type="simulation", debug=False):
+        self.__exec_type = exec_type
+
         self.__interval = None
         self.__n_reads = None
         self.__em = None
+        self.__driver_fpath = None
         self.__setup_ok = False
-        self.__exec_type = exec_type
 
         self.debug = debug
         self.last_run_data = None
@@ -43,7 +45,7 @@ class ClientEM():
 
         try:
             self.__em = w.CreateFile(
-		self.__driver_name, 
+		self.__driver_fpath, 
 		_desiredAccess,
 		_shareMode,
 		_attributes,
@@ -63,6 +65,7 @@ class ClientEM():
         try:
             _ = cfgp.read(cfg_file)
 
+            self.__driver_fpath = cfgp.get("EventMonitor", "fpath")
             self.__interval = float( cfgp.get(self.__exec_type, "interval") )
             self.__n_reads = cfgp.get(self.__exec_type, "n_reads")
 
