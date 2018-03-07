@@ -10,11 +10,13 @@ class ClientEM():
     __VERSION = "V0.01"
 
 
-    def __init__(self, debug=False):
+    def __init__(self, exec_type="simulation", debug=False):
         self.__interval = None
         self.__n_reads = None
         self.__em = None
         self.__setup_ok = False
+        self.__exec_type = exec_type
+
         self.debug = debug
         self.last_run_data = None
         if not self.__setup():
@@ -99,5 +101,5 @@ class ClientEM():
  
 
 if __name__ == "__main__":
-     print("Client for EventMonitor ({ver}).".format(ver=ClientEM.__VERSION)
+     print("Client for EventMonitor ({ver}).".format(ver=ClientEM._ClientEM__VERSION))
 
