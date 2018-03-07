@@ -49,8 +49,7 @@ NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject)
 	DriverObject->MajorFunction[IRP_MJ_WRITE] = Write;
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = Close;
 	
-	char msg[256];
-	debug(msg);
+	dev->Flags |= DO_BUFFERED_IO;
 
 	return STATUS_SUCCESS;
 }
