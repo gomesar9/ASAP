@@ -11,11 +11,11 @@ size_t BFR_BYTE_SIZE = (unsigned)BFR_SIZE * sizeof(char);
 
 int bfr_create() {
 	//BFR = malloc(BFR_BYTE_SIZE);
-	//memset(BFR, '\0', BFR_BYTE_SIZE);
 #ifdef SIMULATION
 	srand( 1337 );
 #endif
 	BFR = ExAllocatePoolWithTag(NonPagedPoolNx, BFR_BYTE_SIZE, 'RFB');
+	memset(BFR, '\0', BFR_BYTE_SIZE);
 
 	return 0;
 }
@@ -39,7 +39,9 @@ int bfr_get(char msg[64]) {
 	}
 	else {
 #ifdef SIMULATION
-		sprintf(BFR,"%i", rand());
+		sprintf(BFR,"%i", rand()); // Not necessary but illustrative
+		strcpy(msg, BFR);
+		memset(BFR, '\0', BFR_BYTE_SIZE);
 		return 0;
 #else		
 		return 1;
