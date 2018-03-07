@@ -1,14 +1,8 @@
-/* Branch Monitor
-* Marcus Botacin
-* 2017
-* adapted by Alexandre Gomes
-*/
-
 #include "device.h"
 #include "../io/IO.h"
 
 /* Create Device Routine
-* THis driver will work as a FS resource
+* This driver will work as a FS resource
 * You can open a handle to this driver
 */
 NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject)
