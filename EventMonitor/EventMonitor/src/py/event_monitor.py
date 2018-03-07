@@ -1,9 +1,3 @@
-'''
- Event Monitor
- Marcus Botacin
- Alexandre R Gomes
- 2018
-'''
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 

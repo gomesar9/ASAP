@@ -1,9 +1,3 @@
-/*
- * Event Monitor
- * Marcus Botacin
- * Alexandre R Gomes
- * 2018
- */
 #pragma once
 
 #define TRACE_FLAGS						0x00000003
