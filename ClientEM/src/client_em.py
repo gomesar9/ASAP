@@ -5,9 +5,17 @@ import configparser
 import time
 # plot
 import matplotlib.pyplot as plt
+from matplotlib import animation
 from numpy import arange
 
 
+def anim(i, cem):
+    ydata = cem.last_run_data
+    cem.ax.clear()
+
+    print("[D] len: {}.".format(len(ydata)) )
+    xdata = arange(0.0, len(ydata) * cem._ClientEM__interval, cem._ClientEM__interval)
+    cem.ax.plot(xdata, ydata)
 
 
 class ClientEM():
@@ -26,8 +34,11 @@ class ClientEM():
         self.__read_bytes = 64
         self.__setup_ok = False
 
+        self.fig = None
+        self.ax = None
+
         self.debug = debug
-        self.last_run_data = None
+        self.last_run_data = [0]
         if not self.__setup():
             print("Please use .__setup(cfg_file='path_to_cfg_file') with a valid configuration file.")
         else:
@@ -112,7 +123,7 @@ class ClientEM():
         ax.grid()
 
         #fig.savefig("last_run.png")
-        plt.show()
+        plt.show(block=False)
 
 
     def start(self):
@@ -121,23 +132,32 @@ class ClientEM():
             if not self.__setup():
                 return False
 
-
-        data = list()
-        for i in range(self.__n_reads):
-            hr, string = w.ReadFile(self.__em, self.__read_bytes, None)
-
-            if hr != 0:
-                print("[!] Error: " + str(e))
-            else:
-                data.append(string)
-
-            time.sleep(self.__interval)
+        try:
+            self.fig = plt.figure()
+            self.ax = self.fig.add_subplot(1, 1, 1)
+            an = animation.FuncAnimation( self.fig, anim, fargs=(self,) )
+            plt.ion()
+            plt.show()
+            for i in range(self.__n_reads):
+                hr, string = w.ReadFile(self.__em, self.__read_bytes, None)
+    
+                if hr != 0:
+                    print("[!] 'start()->w.ReadFile()' Error: " + str(e))
+                else:
+                    self.last_run_data.append(int(string))
+    
+                print(".", end='')
+                #time.sleep(self.__interval)
+                plt.pause(self.__interval)
         
-        # Plot data
-        self.plot_data(data)
-
-        self.last_run_data = data
-        # TODO save data
+            print("[V] Done.")
+            an.event_source.stop()
+            # Plot data
+            #self.plot_data(data)
+    
+            # TODO save data
+        except Exception as e:
+            print("[!] 'start()' Error: " + str(e) )
 
         return True
  
@@ -178,7 +198,7 @@ class CEMShell():
                     )
 
         except Exception as e:
-            print("[!] Error: " + str(e))
+            print("[!] '__config()' Error: " + str(e))
 
 
     def __set_debug(self):
@@ -195,7 +215,7 @@ class CEMShell():
             if _opt == "off":
                 self.__cem.debug = False
         except Exception as e:
-            print("[!] Error: " + str(e))
+            print("[!] '__set_debug()' Error: " + str(e))
 
 
     def __help(self):
@@ -220,7 +240,7 @@ class CEMShell():
                         print("[D] cmd: '{}'".format(self.__cmds[cmd]))
                     self.__cmds[cmd]()
         except Exception as e:
-            print("[!] Error: " + str(e) )
+            print("[!] 'menu()' Error: " + str(e) )
 
         self.__exit()
 
