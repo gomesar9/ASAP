@@ -198,12 +198,15 @@ class CEMShell():
 
     def __config(self):
         try:
-            _n_reads = input("Insert n_reads (number of read operations). Current: {}\n>".format(
+            print("Insert n_reads (number of read operations). Current: {}".format(
                 self.__cem._ClientEM__n_reads )
                 )
-            _interval = input("Insert interval (seconds between reads, can be float). Current: {}\n>".format(
+            _n_reads = input(">")
+
+            print("Insert interval (seconds between reads, can be float). Current: {}".format(
                 self.__cem._ClientEM__interval )
                 )
+            _interval = input(">")
 
             self.__cem.set_config(
                     n_reads = int( _n_reads ),
@@ -216,13 +219,17 @@ class CEMShell():
 
     def __set_debug(self):
         try:
-            _opt = input("CEMS_DEBUG({}). Set debug (on/off):\n>".format(self.debug))
+            print("CEMS_DEBUG({}). Set debug (on/off):".format(self.debug))
+            _opt = input(">")
+
             if _opt == "on":
                 self.debug = True
             if _opt == "off":
                 self.debug = False
             
-            _opt = input("ClientEM_DEBUG({}). Set debug (on/off):\n>".format(self.__cem.debug))
+            print("ClientEM_DEBUG({}). Set debug (on/off):".format(self.__cem.debug))
+            _opt = input(">")
+
             if _opt == "on":
                 self.__cem.debug = True
             if _opt == "off":
@@ -260,7 +267,8 @@ class CEMShell():
         
 if __name__ == "__main__":
      #print("Client for EventMonitor ({ver}).".format(ver=ClientEM._ClientEM__VERSION))
-     #print("Use:\n c = ClientEM(debug=True)")
+     #print("Use:")
+     #print("c = ClientEM(debug=True)")
      #print(" c.start()")
      #print("# Results in c.last_run_data")
      cems = CEMShell(debug=True)
