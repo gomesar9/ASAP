@@ -15,7 +15,12 @@ def anim(i, cem):
 
     #print("[D] len: {}.".format(len(ydata)) )
     xdata = arange(0.0, len(ydata) * cem._ClientEM__interval, cem._ClientEM__interval)
-    cem.ax.plot(xdata, ydata)
+
+    # Workaround for not exact calcs
+    if len(xdata) == len(ydata):
+        cem.ax.plot(xdata, ydata)
+    elif len(xdata)+1 == len(ydata):
+        cem.ax.plot(xdata[:-1], ydata)
 
 
 class ClientEM():
@@ -193,8 +198,12 @@ class CEMShell():
 
     def __config(self):
         try:
-            _n_reads = input("Insert n_reads.\n>")
-            _interval = input("Insert interval.\n>")
+            _n_reads = input("Insert n_reads (number of read operations). Current: {}\n>".format(
+                self.__cem._ClientEM__n_reads )
+                )
+            _interval = input("Insert interval (seconds between reads, can be float). Current: {}\n>".format(
+                self.__cem._ClientEM__interval )
+                )
 
             self.__cem.set_config(
                     n_reads = int( _n_reads ),
