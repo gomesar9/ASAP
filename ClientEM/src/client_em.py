@@ -13,7 +13,7 @@ def anim(i, cem):
     ydata = cem.last_run_data
     cem.ax.clear()
 
-    print("[D] len: {}.".format(len(ydata)) )
+    #print("[D] len: {}.".format(len(ydata)) )
     xdata = arange(0.0, len(ydata) * cem._ClientEM__interval, cem._ClientEM__interval)
     cem.ax.plot(xdata, ydata)
 
@@ -135,7 +135,7 @@ class ClientEM():
         try:
             self.fig = plt.figure()
             self.ax = self.fig.add_subplot(1, 1, 1)
-            an = animation.FuncAnimation( self.fig, anim, fargs=(self,) )
+            an = animation.FuncAnimation( self.fig, anim, fargs=(self,) , interval = self.__interval*1000)
             plt.ion()
             plt.show()
             for i in range(self.__n_reads):
@@ -151,9 +151,13 @@ class ClientEM():
                 plt.pause(self.__interval)
         
             print("[V] Done.")
-            an.event_source.stop()
+
             # Plot data
-            #self.plot_data(data)
+            # Stop!!
+            an.event_source.stop()
+            an.repeat = False
+            plt.ioff()
+            plt.show()
     
             # TODO save data
         except Exception as e:
