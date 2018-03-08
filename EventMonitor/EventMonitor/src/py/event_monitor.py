@@ -55,7 +55,7 @@ class EventMonitor():
             if self.verbose:
                 print("[V] Driver setup [OK].")
         except Exception as e:
-            print("[!] Error:\n" + str(e) )
+            print("[!] Error: " + str(e) )
             return False
 
         return True
@@ -73,7 +73,7 @@ class EventMonitor():
             s = subprocess.Popen( cmd, shell=True )
             return True
         except Exception as e:
-            print("[!] Error:\n" + e.message)
+            print("[!] Error: " + e.message)
             return False
 
 
@@ -156,7 +156,7 @@ class Client():
                 _hTemplateFile
                 )
 
-            print("[D] Connect:\n\t" + cmd)
+            print("[D] Connect: '" + cmd + "'")
 
         self.hdvc = w.CreateFile(
                 self.__driver_name, 
@@ -229,23 +229,21 @@ class Client():
 
 
 def em_help():
-    helptxt =  "# EventMonitor and Client have already been created."
-    helptxt += "\n# em = EventMonitor(debug=True)"
-    helptxt += "\n# c = Client(debug=True)"
-    helptxt += "\n# Use:"
-    helptxt += "\nem.install()"
-    helptxt += "\nem.start()"
-    helptxt += "\n# Connecting Client:"
-    helptxt += "\nc.connect()"
-    helptxt += "\n# And test:"
-    helptxt += "\nc.write('some text')"
-    helptxt += "\nc.read()"
-    helptxt += "\n# Close Client in the end"
-    helptxt += "\nc.close()"
-    helptxt += "\n# Stop driver:"
-    helptxt += "\nem.stop()"
-
-    print(helptxt)
+    print("# EventMonitor and Client have already been created.")
+    print("# em = EventMonitor(debug=True)")
+    print("# c = Client(debug=True)")
+    print("# Use:")
+    print("em.install()")
+    print("em.start()")
+    print("# Connecting Client:")
+    print("c.connect()")
+    print("# And test:")
+    print("c.write('some text')")
+    print("c.read()")
+    print("# Close Client in the end")
+    print("c.close()")
+    print("# Stop driver:")
+    print("em.stop()")
 
 
 class EMShell():
@@ -275,10 +273,8 @@ class EMShell():
 
 
     def __help(self):
-        h = "Commands: install, start, stop, interrogate, read, write, exit"
-        h+= "\nIt is not necessary to run 'start' before 'write'/'read', either 'stop' before 'exit'."
-
-        self.__print(h)
+        print("Commands: install, start, stop, interrogate, read, write, exit")
+        print("It is not necessary to run 'start' before 'write'/'read', either 'stop' before 'exit'.")
 
 
     def __install(self):
@@ -358,7 +354,8 @@ class EMShell():
         try:
             cmd = None
             while cmd != "exit":
-                cmd = input("\n[EMS]> ")
+                print("")
+                cmd = input("[EMS]> ")
 
                 if cmd in self.__cmds:
                     if self.debug:
@@ -378,7 +375,7 @@ if __name__ == "__main__":
     #em = EventMonitor(debug=True)
     #c = Client(debug=True)
 
-    #print("For help:\n\t>em_help()")
+    #print("For help: 'em_help()'")
     ems = EMShell()
     ems.menu()
     
