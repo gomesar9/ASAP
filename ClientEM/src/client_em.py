@@ -189,6 +189,8 @@ class CEMShell():
                 "config": self.__config,
                 "dbg": self.__set_debug,
                 "?": self.__help,
+                "h": self.__help,
+                "help": self.__help
                 }
 
 
@@ -239,7 +241,7 @@ class CEMShell():
 
 
     def __help(self):
-        print("Commands: run, config, dbg")
+        print("Commands: run, config, dbg, exit|quit, ?|h|help")
 
 
     def __exit(self):
@@ -249,11 +251,11 @@ class CEMShell():
     def menu(self):
         print("[ClientEM Shell]")
         self.__help()
-        print("? for help")
+        print("'?', 'h' or 'help' for help. 'exit' or 'quit' for quit.")
         try:
             cmd = None
-            while (cmd != "exit"):
-                cmd = input("[CEMS]> ")
+            while (cmd != "exit" && cmd != "quit"):
+                cmd = input("[CEMS]> ").lower()
 
                 if cmd in self.__cmds:
                     if self.debug:
