@@ -254,7 +254,7 @@ class CEMShell():
         print("'?', 'h' or 'help' for help. 'exit' or 'quit' for quit.")
         try:
             cmd = None
-            while (cmd != "exit" && cmd != "quit"):
+            while (cmd != "exit" and cmd != "quit"):
                 cmd = input("[CEMS]> ").lower()
 
                 if cmd in self.__cmds:
