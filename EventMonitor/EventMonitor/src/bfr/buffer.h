@@ -1,8 +1,5 @@
 #pragma once
-
 #include "../config.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 int bfr_create();
 int bfr_set(char* msg);
