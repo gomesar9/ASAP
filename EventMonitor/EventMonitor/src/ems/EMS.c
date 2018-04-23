@@ -11,32 +11,35 @@ ULONG emsSeed = 1337;
 
 NTSTATUS _unpack(const PANSI_STRING cmd, PEM_CMD emCmd) {
 	NTSTATUS st = STATUS_SUCCESS;
-	UNREFERENCED_PARAMETER(cmd);
-	/*
+	//UNREFERENCED_PARAMETER(cmd);
+	
 	char chunk[2];
-	int num, state;
+	int num, state=0;
 
-	while ((state * 2) + 2 < msg->Length) {
-		StrNCpy(chunk, msg->Buffer, 2);
-		num = atoi(msg->Buffer);
+	while ((state * 2) + 1 < cmd->Length) {
+		strncpy(chunk, &(cmd->Buffer[state*2]), 2);
+		num = atoi(chunk);
 
-		switch (state) { // First state
+		switch (state)
+		{
 		case 0:
-			if (num == EM_SET_EVENT) {
-				emBfr->Type = EM_SET_EVENT;
-			}
+			emCmd->Type = num;
+			break;
+
+		case 1:
+			emCmd->Event = num;
 			break;
 
 		default:
-			emBfr->Type == EM_NO_EVENT;
 			break;
-			state++;
 		}
+		state++;
 	}
-	*/
-
+	
+	/*
 	emCmd->Type = EM_CMD_SET;
 	emCmd->Event = EM_EVT_CACHE_SS;
+	*/
 
 	return st;
 }
@@ -45,6 +48,7 @@ NTSTATUS _unpack(const PANSI_STRING cmd, PEM_CMD emCmd) {
 NTSTATUS execute(const PANSI_STRING cmd) {
 	NTSTATUS st = STATUS_SUCCESS;
 	EM_CMD emCmd;
+	char dbgMsg[64];
 
 	st = _unpack(cmd, &emCmd);
 	if (!NT_SUCCESS(st)) {
@@ -62,12 +66,15 @@ NTSTATUS execute(const PANSI_STRING cmd) {
 			debug("EM_BRANCH_SS setted.");
 			break;
 		default:
+			sprintf(dbgMsg, "%d is not a valid EVENT.", emCmd.Event);
+			debug(dbgMsg);
 			break;
 		}
 	}
 	else {
 		// Error
-		debug("Error 9876");
+		sprintf(dbgMsg, "%d is not a valid CMD.", emCmd.Type);
+		debug(dbgMsg);
 	}
 
 	return st;

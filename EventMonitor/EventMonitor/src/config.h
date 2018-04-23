@@ -5,6 +5,7 @@
 #include <suppress.h>
 #include <stdio.h>
 #include "dbg/debug.h"
+#include "stdlib.h" // Needed for atoi()
 
 
 #define DEBUG 1 /* define if debug info will be printed */

@@ -9,6 +9,7 @@
 //#include "list\list.h"
 //#include "BTS\BTS.h"
 #include "../bfr/buffer.h"
+#include "../ems/EMS.h"
 
 
 /* Write data from the userland to driver stack */
@@ -20,7 +21,8 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	PIO_STACK_LOCATION PIO_STACK_IRP;
 	UINT32 datasize, sizerequired= 0;
 	//char *entry = NULL;
-	char entry[64], msg[128];
+	//char entry[64]; 
+	char msg[128];
 	NTSTATUS NtStatus = STATUS_SUCCESS;
 	UNREFERENCED_PARAMETER(DeviceObject);
 	NtStatus = STATUS_SUCCESS;
@@ -33,7 +35,23 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	sprintf(msg, "Parameters.Write.Length: %I32u", datasize);
 	debug(msg);
 	/* Reading */
+#ifdef REFAC
+	if (datasize == EMS_CMD_MAX_LENGTH) {
+		ANSI_STRING cmd;
+		PCHAR cmdBfr = ExAllocatePoolWithTag(NonPagedPoolNx, EMS_CMD_MAX_LENGTH, 'CMD');
+		memcpy(cmdBfr, userbuffer, datasize);
 
+		RtlInitEmptyAnsiString(&cmd, cmdBfr, (USHORT) EMS_CMD_MAX_LENGTH);
+		cmd.Length = (USHORT) datasize;
+
+		sprintf(msg, "IO(REFAC): msg received: %s", cmd.Buffer);
+		debug(msg);
+
+		NtStatus = execute(&cmd);
+		
+		Irp->IoStatus.Status = NtStatus;
+	}
+#else
 	//entry = malloc((int) (datasize));
 	if (datasize < 64){
 		memcpy(entry, userbuffer, datasize);
@@ -44,14 +62,15 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 		Irp->IoStatus.Status = NtStatus;
 		//Irp->IoStatus.Information = sizerequired;
-	}
-	else {
+	} else {
 		//memcpy(entry, userbuffer, 63);
 		sprintf(msg, "IO: msg received is greater than 64 bytes");
 		Irp->IoStatus.Status = NtStatus;
 	}
-	
 	debug(msg);
+#endif
+	
+	
 	//memcpy(entry, userbuffer, sizerequired);
 	
 	Irp->IoStatus.Status = NtStatus;

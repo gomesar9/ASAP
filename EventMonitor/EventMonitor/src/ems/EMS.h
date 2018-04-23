@@ -30,3 +30,5 @@ NTSTATUS _unpack(const PANSI_STRING cmd, PEM_CMD emCmd);
 NTSTATUS execute(const PANSI_STRING cmd);
 NTSTATUS sample(PANSI_STRING info);
 //NTSTATUS bfr_destroy();
+
+#define EMS_CMD_MAX_LENGTH 4
