@@ -15,7 +15,6 @@ BOOLEAN PEBS_ACTIVE = FALSE;
 PTDS_BASE DS_BASE;
 PTPEBS_BUFFER PEBS_BUFFER;
 
-
 NTSTATUS _unpack(const PANSI_STRING cmd, PEM_CMD emCmd) {
 	NTSTATUS st = STATUS_SUCCESS;
 	//UNREFERENCED_PARAMETER(cmd);
@@ -169,6 +168,7 @@ NTSTATUS sample(PANSI_STRING emBfr) {
 VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	UNREFERENCED_PARAMETER(Interrupt);
 	UNREFERENCED_PARAMETER(ServiceContext);
+	debug("Interrupt routine reached");
 
 	LARGE_INTEGER pa;
 	UINT32* APIC;
@@ -193,19 +193,16 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	MmUnmapIoSpace(APIC, sizeof(UINT32));
 
 	// TODO: PROCESS
-	debug("Interrupt routine reached");
+	char msg[128];
+	sprintf(msg, "R10: %lld", DS_BASE->PEBS_BUFFER_BASE->R10);
+	debug(msg);
 
 	// TODO: Re-enable PEBS in near future
 
 }
 
-typedef union ACUCAR {
-	PVOID V;
-	VOID (*F) (__in struct _KINTERRUPT *, __in PVOID);
-} ACUCAR;
-
 // Hook Handles
-ACUCAR blah;
+TFUNC_POINTER perfmon_hook;
 PVOID restore_hook = NULL;
 
 /*
@@ -220,16 +217,15 @@ VOID hook_handler() {
 		_Out_	PVOID						Buffer
 	);
 	*/
-	blah.F = PMI;
-	PVOID perfmon_hook = blah.V;
+	perfmon_hook.Function = PMI;
 
 	st = HalSetSystemInformation(
 		HalProfileSourceInterruptHandler,
 		sizeof(PVOID*),
-		&perfmon_hook
+		&perfmon_hook.Pointer
 	);
 	char msg[126];
-	sprintf(msg, "HOOK_HANDLER: ST:%X. F:%p", st, blah.V);
+	sprintf(msg, "HOOK_HANDLER: ST:%X. F:%p", st, perfmon_hook.Pointer);
 	debug(msg);
 }
 
@@ -275,10 +271,11 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	// Attach thread to core
 	thread_attach_to_core(core);
 
-	// TODO: Allocate structs and buffers
+	// Allocate structs and buffers
 	DS_BASE = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), 'DSB');
 	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, sizeof(PTPEBS_BUFFER), 'PBF');
 	fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
+	__writemsr(MSR_DS_AREA, (UINT_PTR)DS_BASE);
 
 	// --+-- Enable mechanism --+--
 	// Disable PEBS to set up
@@ -286,6 +283,7 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	__writemsr(MSR_IA32_PERFCTR0, PERIOD);
 	// Enable events
 	__writemsr(MSR_IA32_EVNTSEL0, PEBS_EVENT | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
+
 	// Enable PEBS
 	__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
 	__writemsr(MSR_IA32_GLOBAL_CTRL, ENABLE_PEBS);

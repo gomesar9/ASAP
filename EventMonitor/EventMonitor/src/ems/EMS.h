@@ -2,7 +2,12 @@
 #include "../config.h"
 #include <intrin.h>
 
-
+/*
+*/
+typedef union _TRICK {
+	PVOID Pointer;
+	VOID(*Function) (__in struct _KINTERRUPT *, __in PVOID);
+} TFUNC_POINTER, *PTFUNC_POINTER;
 /* #################################################
  BTS struct
 */
@@ -104,6 +109,7 @@ NTSTATUS sample(PANSI_STRING info);
 
 #define PEBS_EVENT 0x1c2
 
+#define MSR_DS_AREA 1536
 /*
  Functions
 */
