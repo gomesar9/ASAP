@@ -10,6 +10,7 @@ ULONG emsSeed = 1337;
 #endif
 HANDLE thandle;
 BOOLEAN PEBS_ACTIVE = FALSE;
+UINT16 INTERRUPTS = 0;
 
 // PEBS base and buffer
 PTDS_BASE DS_BASE;
@@ -132,6 +133,7 @@ NTSTATUS execute(const PANSI_STRING cmd) {
 			// uninstall hook after stop Thread
 			unhook_handler();
 			PEBS_ACTIVE = FALSE;
+			INTERRUPTS = 0; // TODO: Make vector for multiple cores
 			break;
 		default:
 			sprintf(dbgMsg, "%d is not a valid Stop Configuration.", emCmd.Event);
@@ -205,13 +207,20 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	MmUnmapIoSpace(APIC, sizeof(UINT32));
 
 	// TODO: PROCESS
+	INTERRUPTS += 1;
 	char msg[128];
-	sprintf(msg, "RAX: %lld", DS_BASE->PEBS_BUFFER_BASE->RAX);
+	sprintf(msg, "(%d) RAX: %lld", INTERRUPTS, DS_BASE->PEBS_BUFFER_BASE->RAX);
 	debug(msg);
 
 	// TODO: Re-enable PEBS in near future
-
-
+	if (INTERRUPTS < MAX_INTERRUPTS) {
+		//fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
+		DS_BASE->PEBS_BUFFER_BASE = PEBS_BUFFER;
+		DS_BASE->PEBS_INDEX = PEBS_BUFFER;	// Reset index
+		// Enable PEBS
+		__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
+		__writemsr(MSR_IA32_GLOBAL_CTRL, ENABLE_PEBS);
+	}
 }
 
 // Hook Handles

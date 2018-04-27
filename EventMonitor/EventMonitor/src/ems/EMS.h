@@ -88,6 +88,7 @@ NTSTATUS sample(PANSI_STRING info);
 #define EMS_CMD_MAX_LENGTH 4
 #define DISABLE_PEBS 0
 #define ENABLE_PEBS 1
+#define MAX_INTERRUPTS 5
 
 // Limit
 #define PERIOD 1
