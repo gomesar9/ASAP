@@ -4,7 +4,7 @@
 
 /*
 */
-typedef union _TRICK {
+typedef union st_TRICK {
 	PVOID Pointer;
 	VOID(*Function) (__in struct _KINTERRUPT *, __in PVOID);
 } TFUNC_POINTER, *PTFUNC_POINTER;
@@ -54,10 +54,10 @@ typedef enum _EM_CMD_TYPE {
 
 // Enum (options) for EM_CMD_START
 typedef enum _START_CFG {
-	EM_STCFG_CORE0,
-	EM_STCFG_CORE1,
-	EM_STCFG_CORE2,
-	EM_STCFG_CORE3
+	EM_STCFG_CORE0 = 1,
+	EM_STCFG_CORE1 = 1<<1,
+	EM_STCFG_CORE2 = 1<<2,
+	EM_STCFG_CORE3 = 1<<3
 }START_CFG, *PSTART_CFG;
 
 // Enum (options) for EM_CMD_SET

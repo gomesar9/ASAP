@@ -86,27 +86,39 @@ NTSTATUS execute(const PANSI_STRING cmd) {
 		// Install hook before start Thread
 		hook_handler();
 
-		switch (emCmd.Event) {
-		case EM_STCFG_CORE0:
+		// TODO: Apply mask to enable multiple cores
+		if ((emCmd.Event & 1) == 1) {
+			// Core 0
 			debug("Activating PEBS in core 0.");
-			st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*) 0);
+			st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)0);
 
 			if (NT_SUCCESS(st)) {
 				PEBS_ACTIVE = TRUE;
-			} else {
+			}
+			else {
 				PEBS_ACTIVE = FALSE;
 			}
-			break;
-		case EM_STCFG_CORE1:
+		}
+
+		if ((emCmd.Event & 2) == 2) {
+			// Core 1
 			debug("Activating PEBS in core 1. (FUTURE)");
-			break;
-		default:
+		}
+		
+		if ((emCmd.Event & 4) == 4) {
+			// Core 2
+		}
+
+		if ((emCmd.Event & 8) == 8) {
+			// Core 3
+		}
+		
+		if (PEBS_ACTIVE == FALSE) {
 			sprintf(dbgMsg, "%d is not a valid Start Configuration.", emCmd.Event);
 			debug(dbgMsg);
-			break;
 		}
-	}
-	else if (emCmd.Type == EM_CMD_STOP) {
+		
+	} else if (emCmd.Type == EM_CMD_STOP) {
 		if (PEBS_ACTIVE == FALSE) {
 			// TODO: Return better code error
 			return STATUS_FAIL_CHECK;
@@ -168,7 +180,7 @@ NTSTATUS sample(PANSI_STRING emBfr) {
 VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	UNREFERENCED_PARAMETER(Interrupt);
 	UNREFERENCED_PARAMETER(ServiceContext);
-	debug("Interrupt routine reached");
+	//debug("Interrupt routine reached");
 
 	LARGE_INTEGER pa;
 	UINT32* APIC;
@@ -194,10 +206,11 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 
 	// TODO: PROCESS
 	char msg[128];
-	sprintf(msg, "R10: %lld", DS_BASE->PEBS_BUFFER_BASE->R10);
+	sprintf(msg, "RAX: %lld", DS_BASE->PEBS_BUFFER_BASE->RAX);
 	debug(msg);
 
 	// TODO: Re-enable PEBS in near future
+
 
 }
 

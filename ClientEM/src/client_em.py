@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import win32file as w
 import configparser
@@ -7,6 +6,7 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from numpy import arange
+import threading
 
 
 def anim(i, cem):
@@ -24,8 +24,13 @@ def anim(i, cem):
 
 
 class ClientEM():
-    """docstring for ClientEM"""
-    __VERSION = "V0.02a"
+    """ Cleint of Event Monitor
+        V0.02a: Run simulation, plot graphics
+        V0.03a: Enable/disable PEBS with cores 1,2,3 and/or 4.
+    """
+    __VERSION = "V0.03a"
+    __START_CODE = '00'
+    __STOP_CODE = '02'
 
 
     def __init__(self, exec_type="simulation", debug=False):
@@ -38,6 +43,8 @@ class ClientEM():
         self.__n_reads = None
         self.__read_bytes = 64
         self.__setup_ok = False
+        self.__pebs_cores = 0
+        self.__is_pebs_enable = False
 
         self.fig = None
         self.ax = None
@@ -58,8 +65,15 @@ class ClientEM():
                 print("[!][D] ERROR: " + str(e))
 
 
-    def __connect_to_event_monitor(self):
-        _desiredAccess = w.GENERIC_READ  # READ/WRITE/EXECUTE
+    def __connect_to_event_monitor(self, mode='read'):
+        if mode.lower() == 'read':
+            _desiredAccess = w.GENERIC_READ  # READ/WRITE/EXECUTE
+        elif mode.lower() == 'write':
+            _desiredAccess = w.GENERIC_WRITE  # READ/WRITE/EXECUTE
+        else:
+            print("[!] '__connect_to_event_monitor()' mode invalid") 
+            return False
+
         _shareMode = 0  # Not shared
         _attributes = None
         _creationDisposition = w.OPEN_EXISTING
@@ -82,6 +96,19 @@ class ClientEM():
 
         return True
 
+    def __disconnect_from_event_monitor(self):
+        if self.__em:
+            w.CloseHandle(self.__em)
+            self.__em = None
+
+
+    def __parse_cores(self, cores):
+        r = 0
+        for c in cores.split(','):
+            r += 2 ** (int(c)-1)
+
+        return '{:02d}'.format(r)
+
 
     def __setup(self, cfg_file="client.cfg"):
         cfgp = configparser.ConfigParser()
@@ -91,8 +118,10 @@ class ClientEM():
             self.__driver_fpath = cfgp.get("EventMonitor", "fpath")
             self.__interval = float( cfgp.get(self.__exec_type, "interval") )
             self.__n_reads = int( cfgp.get(self.__exec_type, "n_reads") )
+            self.__pebs_cores = self.__parse_cores( cfgp.get( "EventMonitor", "cores") )
 
-            return self.__connect_to_event_monitor()
+#            return self.__connect_to_event_monitor()
+            return True
         except Exception as e:
             print("[!] '__setup()' Error: " + str(e))
             return False
@@ -131,6 +160,51 @@ class ClientEM():
         plt.show(block=False)
 
 
+    def enable_pebs(self):
+        if not self.__is_pebs_enable:
+            if self.__em:
+                print("[!] Driver already in use.")
+                return False
+            if not self.__connect_to_event_monitor(mode='write'):
+                return False
+
+            _start_message = '{}{}'.format(ClientEM.__START_CODE, self.__pebs_cores)
+            errCod, nBytesWritten = w.WriteFile(self.__em, _start_message.encode(), None)
+
+            self.__disconnect_from_event_monitor()
+            if errCod != 0:
+                print("Error :" + errCod)
+                return False
+            else:
+                self.__is_pebs_enable = True
+                return True
+        else:
+            print("[!] PEBS is already enabled.")
+            return False
+
+
+    def disable_pebs(self):
+        if self.__is_pebs_enable:
+            if self.__em:
+                print("[!] Driver already in use.")
+                return False
+            if not self.__connect_to_event_monitor(mode='write'):
+                return False
+            # TODO: for now disable all cores, but it is possible disable just one
+            _stop_message = '{}{}'.format(ClientEM.__STOP_CODE, self.__pebs_cores) 
+            errCod, nBytesWritten = w.WriteFile(self.__em, _stop_message.encode(), None)
+
+            self.__disconnect_from_event_monitor()
+            if errCod != 0:
+                print("Error :" + errCod)
+                return False
+            else:
+                return True
+        else:
+            print("[!] PEBS is not enabled.")
+            return False
+
+
     def start(self):
         if not self.__setup_ok:
             print("[!] Setup failed. Trying again.")
@@ -138,6 +212,11 @@ class ClientEM():
                 return False
 
         try:
+            self.__enable_pebs()
+
+            if not __connect_to_event_monitor(mode='read'):
+                return False
+
             self.fig = plt.figure()
             self.ax = self.fig.add_subplot(1, 1, 1)
             an = animation.FuncAnimation( self.fig, anim, fargs=(self,) , interval = self.__interval*1000)
@@ -163,16 +242,16 @@ class ClientEM():
             an.repeat = False
             plt.ioff()
             plt.show()
-    
-            # TODO save data
         except Exception as e:
-            print("[!] 'start()' Error: " + str(e) )
+            pass
+        self.__disconnect_from_event_monitor()
+        self.__disable_pebs()
 
         return True
  
 
     def __del__(self):
-        w.CloseHandle(self.__em)
+        self.__disconnect_from_event_monitor()
         
 
 class CEMShell():
@@ -195,7 +274,9 @@ class CEMShell():
 
 
     def __run(self):
-        self.__cem.start()
+        t = threading.Thread(target=self.__cem.start)
+        t.start()
+        #self.__cem.start()
 
 
     def __config(self):
@@ -245,7 +326,8 @@ class CEMShell():
 
 
     def __exit(self):
-        pass
+        del self.__cem
+        print("Exiting")
 
 
     def menu(self):
