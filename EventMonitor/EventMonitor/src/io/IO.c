@@ -32,8 +32,8 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	userbuffer = Irp->AssociatedIrp.SystemBuffer;
 	datasize = PIO_STACK_IRP->Parameters.Write.Length;
 
-	sprintf(msg, "Parameters.Write.Length: %I32u", datasize);
-	debug(msg);
+	//sprintf(msg, "Parameters.Write.Length: %I32u", datasize);
+	//debug(msg);
 	/* Reading */
 #ifdef REFAC
 	if (datasize == EMS_CMD_MAX_LENGTH) {

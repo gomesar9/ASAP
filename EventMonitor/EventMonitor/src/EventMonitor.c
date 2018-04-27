@@ -103,7 +103,7 @@ EventMonitorUnload (
 
     //PAGED_CODE();
 
-    debug("EventMonitorUnload: Entered");
+    //debug("EventMonitorUnload: Entered");
 
 	//PT_DBG_PRINT(PTDBG_TRACE_ROUTINES, ("Removing Device"));
 
