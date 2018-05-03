@@ -1,9 +1,11 @@
 #include "device.h"
 #include "../io/IO.h"
 
-/* Create Device Routine
-* This driver will work as a FS resource
-* You can open a handle to this driver
+/* 
+- V.0.2a, 03/05/2018:
+  - Supports PEBS re-enable
+  - Supports all PEBS events listed in Nehalem Performance Monitoring Unit Programming Guide (Enum)
+  - Device `Read` now inform counted events
 */
 NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject)
 {
@@ -11,7 +13,7 @@ NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject)
 	NTSTATUS status;
 	PDEVICE_OBJECT dev;
 	UNICODE_STRING namestring, linkstring;
-	debug("Creating Device V.0.1a");
+	debug("Creating Device V.0.2a");
 
 	RtlInitUnicodeString(&namestring, DRIVERNAME);
 	status = IoCreateDevice(DriverObject, 0, &namestring, FILE_DEVICE_DISK_FILE_SYSTEM, FILE_DEVICE_SECURE_OPEN, FALSE, &dev);

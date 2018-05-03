@@ -13,15 +13,17 @@
 /* Write data from the userland to driver stack */
 NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
+	UNREFERENCED_PARAMETER(DeviceObject);
 	//debug("IO::Write : Entered");
 	//TBTS_BUFFER bdata;
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
 	UINT32 datasize, sizerequired= 0;
-	char msg[128];
+	CHAR msg[128];
 	NTSTATUS NtStatus = STATUS_SUCCESS;
-	UNREFERENCED_PARAMETER(DeviceObject);
-	NtStatus = STATUS_SUCCESS;
+	// --+-- EMC use --+--
+	ANSI_STRING cmd;
+	PCHAR cmdBfr;
 	
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
 
@@ -30,8 +32,7 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 	// Reading
 	if (datasize == EMS_CMD_MAX_LENGTH) {
-		ANSI_STRING cmd;
-		PCHAR cmdBfr = ExAllocatePoolWithTag(NonPagedPoolNx, EMS_CMD_MAX_LENGTH, 'CMD');
+		cmdBfr = ExAllocatePoolWithTag(NonPagedPoolNx, EMS_CMD_MAX_LENGTH, 'CMD');
 		memcpy(cmdBfr, userbuffer, datasize);
 
 		RtlInitEmptyAnsiString(&cmd, cmdBfr, (USHORT) EMS_CMD_MAX_LENGTH);
@@ -41,7 +42,7 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 		debug(msg);
 
 		NtStatus = execute(&cmd);
-		
+		ExFreePoolWithTag(cmdBfr, 'CMD');
 		Irp->IoStatus.Status = NtStatus;
 	}	
 	
@@ -63,37 +64,58 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	PIO_STACK_LOCATION PIO_STACK_IRP;
 	UINT32 datasize;//, sizerequired;
 	size_t sizerequired;
-	NTSTATUS NtStatus = STATUS_SUCCESS;
 	UNREFERENCED_PARAMETER(DeviceObject);
-	NtStatus = STATUS_SUCCESS;
-	
+
+#ifdef REFAC
+	ULONGLONG _count;
+	char buff[BFR_SIZE];
+#else
+	char buff[BFR_SIZE];
+#endif
+
 	userbuffer = Irp->AssociatedIrp.SystemBuffer;
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
-	
-	char buff[BFR_SIZE];
 	datasize = PIO_STACK_IRP->Parameters.Read.Length;
-	int resp = bfr_get(buff);
-	
-	if (resp == 0) {
-		debug("Msg found on buffer");
-		sizerequired = strlen(buff);
 
+	// --+-- BAND-AID --+--
+	count_get(&_count);
+	//int resp = 0;
+	sprintf(buff, "%llu", _count);
+	
+	
+#ifdef DEBUG
+		//debug("Msg found on buffer");
+#endif
+
+#ifdef REFAC
+	sizerequired = strlen(buff);
+	memcpy(userbuffer, buff, sizerequired);
+
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	Irp->IoStatus.Information = sizerequired;
+#else
+	if (resp == 0) {
+		sizerequired = strlen(buff);
 		if (datasize >= sizerequired) {
+#ifdef DEBUG
 			debug("Copying data to userbuffer");
+#endif
 			memcpy(userbuffer, buff, sizerequired);
 
-			Irp->IoStatus.Status = NtStatus;
+			Irp->IoStatus.Status = STATUS_SUCCESS;
 			Irp->IoStatus.Information = sizerequired;
 		} else {
 			debug("Insufficient IRP size.");
-			Irp->IoStatus.Status = NtStatus;
+			Irp->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
 			Irp->IoStatus.Information = 0;
 		}
 	}
+#endif
+
 
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
-	return NtStatus;
+	return STATUS_SUCCESS;
 }
 
 /* Create File -- start capture mechanism */

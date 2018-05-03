@@ -1,5 +1,7 @@
 #include "buffer.h"
+#include "../ems/EMS.h"
 
+ULONGLONG BFR2;
 char *BFR;
 size_t BFR_BYTE_SIZE = (unsigned)BFR_SIZE * sizeof(char);
 #ifdef SIMULATION
@@ -9,10 +11,21 @@ ULONG bfrSeed = 1337;
 int bfr_create() {
 	BFR = ExAllocatePoolWithTag(NonPagedPoolNx, BFR_BYTE_SIZE, 'RFB');
 	memset(BFR, '\0', BFR_BYTE_SIZE);
+	BFR2 = 0;
 
 	return 0;
 }
 
+#ifdef REFAC
+void bfr_tick() {
+	BFR2 += _PERIOD;
+}
+
+void count_get(_Out_ PULONGLONG count) {
+	*count = BFR2;
+	BFR2 = 0;
+}
+#endif
 
 int bfr_set(char* msg) {
 	if (strlen(msg) < BFR_SIZE) {
@@ -21,7 +34,6 @@ int bfr_set(char* msg) {
 	}
 	return 0;
 }
-
 
 int bfr_get(char msg[64]) {
 	if (strlen(BFR) > 0) {
@@ -45,7 +57,6 @@ int bfr_get(char msg[64]) {
 #endif
 	}
 }
-
 
 int bfr_destroy() {
 	ExFreePoolWithTag(BFR, 'RFB');

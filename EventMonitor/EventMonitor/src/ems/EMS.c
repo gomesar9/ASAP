@@ -48,9 +48,8 @@ void to_buffer(int info){
 	bfr_set(msg_bfr);
 }
 
-NTSTATUS _unpack(const PANSI_STRING cmd, PEM_CMD emCmd) {
+NTSTATUS _unpack(const PANSI_STRING cmd, PTEM_CMD emCmd) {
 	NTSTATUS st = STATUS_SUCCESS;
-	//UNREFERENCED_PARAMETER(cmd);
 	
 	char chunk[2];
 	int num, state=0;
@@ -86,7 +85,7 @@ NTSTATUS _unpack(const PANSI_STRING cmd, PEM_CMD emCmd) {
 
 NTSTATUS execute(const PANSI_STRING cmd) {
 	NTSTATUS st = STATUS_SUCCESS;
-	EM_CMD emCmd;
+	TEM_CMD emCmd;
 	char dbgMsg[64];
 
 	st = _unpack(cmd, &emCmd);
@@ -112,12 +111,14 @@ NTSTATUS execute(const PANSI_STRING cmd) {
 		to_buffer(I_CGF_SET);
 
 	} else if (emCmd.Type == EM_CMD_START) {
+		/*
 #ifdef DEBUG
-		char _msg[64];
+		char _msg[128];
 		sprintf(_msg, "EM_START (PERIOD: %llu)", _PERIOD);
 		debug(_msg);
 #endif
-		to_buffer(I_START);
+		*/
+		//to_buffer(I_START);
 
 		if (PEBS_ACTIVE) {
 			// TODO: Return better code error
@@ -254,9 +255,12 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	//char msg[128];
 	//sprintf(msg, "(%d) RAX: %lld", INTERRUPTS, DS_BASE->PEBS_BUFFER_BASE->RAX);
 	//debug(msg);
+	
 	char msg_bfr[BFR_SIZE];
 	sprintf(msg_bfr, "INTERRUPT: %d\0", INTERRUPTS);
 	bfr_set(msg_bfr);
+
+	bfr_tick();
 
 	// TODO: Re-enable PEBS in near future
 	if (INTERRUPTS < MAX_INTERRUPTS) {
@@ -350,9 +354,12 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	// --+-- Enable mechanism --+--
 	// Disable PEBS to set up
 	__writemsr(MSR_IA32_GLOBAL_CTRL, DISABLE_PEBS);
+	
+	// Set threshold (counter) and events
 	__writemsr(MSR_IA32_PERFCTR0, PERIOD);
-	// Enable events
-	__writemsr(MSR_IA32_EVNTSEL0, PEBS_EVENT | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
+	//__writemsr(MSR_IA32_EVNTSEL0, PEBS_EVENT | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
+	TEPEBS_EVENTS _evt = _PE_BR_MISP_ALL_BRANCHES;
+	__writemsr(MSR_IA32_EVNTSEL0, _evt | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
 
 	// Enable PEBS
 	__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
