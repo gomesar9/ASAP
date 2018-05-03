@@ -91,7 +91,8 @@ NTSTATUS sample(PANSI_STRING info);
 #define MAX_INTERRUPTS 5
 
 // Limit
-#define PERIOD 1
+#define _PERIOD 10ull
+#define PERIOD ULLONG_MAX - _PERIOD
 
 #define EVTSEL_EN 1<<22
 #define EVTSEL_USR 1<<16
@@ -111,10 +112,10 @@ NTSTATUS sample(PANSI_STRING info);
 #define PEBS_EVENT 0x1c2
 
 #define MSR_DS_AREA 1536
+
 /*
  Functions
 */
-
 VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext);
 VOID hook_handler();
 VOID unhook_handler();

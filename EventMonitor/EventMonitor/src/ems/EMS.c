@@ -1,4 +1,6 @@
 #include "EMS.h"
+#include "../bfr/buffer.h"
+
 /*
  * void __writemsr(
  *     unsigned long Register,
@@ -15,6 +17,36 @@ UINT16 INTERRUPTS = 0;
 // PEBS base and buffer
 PTDS_BASE DS_BASE;
 PTPEBS_BUFFER PEBS_BUFFER;
+
+typedef enum _INFOS{
+	I_START,
+	I_ENABLE,
+	I_CGF_SET,
+	I_STOP
+}E_INFO, *PE_INFO;
+
+void to_buffer(int info){
+	char msg_bfr[BFR_SIZE];
+
+	switch (info) {
+	case I_START:
+		sprintf(msg_bfr, "STARTED\0");
+		break;
+	case I_ENABLE:
+		sprintf(msg_bfr, "ENABLED\0");
+		break;
+	case I_CGF_SET:
+		sprintf(msg_bfr, "CONFIG SET\0");
+		break;
+	case I_STOP:
+		sprintf(msg_bfr, "STOPPED\0");
+		break;
+	default:
+		break;
+	}
+	
+	bfr_set(msg_bfr);
+}
 
 NTSTATUS _unpack(const PANSI_STRING cmd, PEM_CMD emCmd) {
 	NTSTATUS st = STATUS_SUCCESS;
@@ -77,8 +109,16 @@ NTSTATUS execute(const PANSI_STRING cmd) {
 			debug(dbgMsg);
 			break;
 		}
+		to_buffer(I_CGF_SET);
+
 	} else if (emCmd.Type == EM_CMD_START) {
-		debug("EM_START detected.");
+#ifdef DEBUG
+		char _msg[64];
+		sprintf(_msg, "EM_START (PERIOD: %llu)", _PERIOD);
+		debug(_msg);
+#endif
+		to_buffer(I_START);
+
 		if (PEBS_ACTIVE) {
 			// TODO: Return better code error
 			return STATUS_RM_ALREADY_STARTED;
@@ -117,6 +157,8 @@ NTSTATUS execute(const PANSI_STRING cmd) {
 		if (PEBS_ACTIVE == FALSE) {
 			sprintf(dbgMsg, "%d is not a valid Start Configuration.", emCmd.Event);
 			debug(dbgMsg);
+		} else {
+			to_buffer(I_ENABLE);
 		}
 		
 	} else if (emCmd.Type == EM_CMD_STOP) {
@@ -125,6 +167,7 @@ NTSTATUS execute(const PANSI_STRING cmd) {
 			return STATUS_FAIL_CHECK;
 		}
 
+		to_buffer(I_STOP);
 		switch (emCmd.Event) {
 		case EM_STCFG_CORE0:
 			debug("Deactivating PEBS in core 0.");
@@ -208,16 +251,21 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 
 	// TODO: PROCESS
 	INTERRUPTS += 1;
-	char msg[128];
-	sprintf(msg, "(%d) RAX: %lld", INTERRUPTS, DS_BASE->PEBS_BUFFER_BASE->RAX);
-	debug(msg);
+	//char msg[128];
+	//sprintf(msg, "(%d) RAX: %lld", INTERRUPTS, DS_BASE->PEBS_BUFFER_BASE->RAX);
+	//debug(msg);
+	char msg_bfr[BFR_SIZE];
+	sprintf(msg_bfr, "INTERRUPT: %d\0", INTERRUPTS);
+	bfr_set(msg_bfr);
 
 	// TODO: Re-enable PEBS in near future
 	if (INTERRUPTS < MAX_INTERRUPTS) {
 		//fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
 		DS_BASE->PEBS_BUFFER_BASE = PEBS_BUFFER;
 		DS_BASE->PEBS_INDEX = PEBS_BUFFER;	// Reset index
+
 		// Enable PEBS
+		__writemsr(MSR_IA32_PERFCTR0, PERIOD);
 		__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
 		__writemsr(MSR_IA32_GLOBAL_CTRL, ENABLE_PEBS);
 	}

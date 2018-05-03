@@ -1,7 +1,5 @@
 #include "buffer.h"
 
-#define BFR_SIZE 64
-
 char *BFR;
 size_t BFR_BYTE_SIZE = (unsigned)BFR_SIZE * sizeof(char);
 #ifdef SIMULATION
@@ -38,7 +36,11 @@ int bfr_get(char msg[64]) {
 		strcpy(msg, BFR);
 		memset(BFR, '\0', BFR_BYTE_SIZE);
 		return 0;
-#else		
+#else
+		sprintf(BFR, "None");
+		strcpy(msg, BFR);
+		memset(BFR, '\0', BFR_BYTE_SIZE);
+		return 0;
 		return 1;
 #endif
 	}

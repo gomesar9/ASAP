@@ -1,13 +1,11 @@
-/* Branch Monitor
-* Marcus Botacin
-* 2017
+/* 
+* Event Monitor (extends Branch Monitor)
+* Marcus Botacin, Alexandre Gomes
+* 2018
 */
 
 #include "IO.h"
 #include "../dbg/debug.h"
-//#include "Threading\thread.h"
-//#include "list\list.h"
-//#include "BTS\BTS.h"
 #include "../bfr/buffer.h"
 #include "../ems/EMS.h"
 
@@ -20,8 +18,6 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
 	UINT32 datasize, sizerequired= 0;
-	//char *entry = NULL;
-	//char entry[64]; 
 	char msg[128];
 	NTSTATUS NtStatus = STATUS_SUCCESS;
 	UNREFERENCED_PARAMETER(DeviceObject);
@@ -32,10 +28,7 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	userbuffer = Irp->AssociatedIrp.SystemBuffer;
 	datasize = PIO_STACK_IRP->Parameters.Write.Length;
 
-	//sprintf(msg, "Parameters.Write.Length: %I32u", datasize);
-	//debug(msg);
-	/* Reading */
-#ifdef REFAC
+	// Reading
 	if (datasize == EMS_CMD_MAX_LENGTH) {
 		ANSI_STRING cmd;
 		PCHAR cmdBfr = ExAllocatePoolWithTag(NonPagedPoolNx, EMS_CMD_MAX_LENGTH, 'CMD');
@@ -44,34 +37,13 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 		RtlInitEmptyAnsiString(&cmd, cmdBfr, (USHORT) EMS_CMD_MAX_LENGTH);
 		cmd.Length = (USHORT) datasize;
 
-		sprintf(msg, "IO(REFAC): msg received: %s", cmd.Buffer);
+		sprintf(msg, "IO: msg received: %s", cmd.Buffer);
 		debug(msg);
 
 		NtStatus = execute(&cmd);
 		
 		Irp->IoStatus.Status = NtStatus;
-	}
-#else
-	//entry = malloc((int) (datasize));
-	if (datasize < 64){
-		memcpy(entry, userbuffer, datasize);
-		entry[datasize] = '\0';
-
-		bfr_set((char*) userbuffer);
-		sprintf(msg, "IO: msg received: %s", entry);
-
-		Irp->IoStatus.Status = NtStatus;
-		//Irp->IoStatus.Information = sizerequired;
-	} else {
-		//memcpy(entry, userbuffer, 63);
-		sprintf(msg, "IO: msg received is greater than 64 bytes");
-		Irp->IoStatus.Status = NtStatus;
-	}
-	debug(msg);
-#endif
-	
-	
-	//memcpy(entry, userbuffer, sizerequired);
+	}	
 	
 	Irp->IoStatus.Status = NtStatus;
 	Irp->IoStatus.Information = sizerequired;
@@ -98,11 +70,7 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	userbuffer = Irp->AssociatedIrp.SystemBuffer;
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
 	
-	/* Greetings */
-	//char hello[] = "Hello\n\r";
-	//sizerequired = sizeof(hello);
-	char buff[64];
-
+	char buff[BFR_SIZE];
 	datasize = PIO_STACK_IRP->Parameters.Read.Length;
 	int resp = bfr_get(buff);
 	
@@ -122,22 +90,7 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 			Irp->IoStatus.Information = 0;
 		}
 	}
-	/*
-	sizerequired = 6;
-	
 
-	if (datasize >= sizerequired) {
-		debug("Copying data to userbuffer");
-		//memcpy(userbuffer, &hello, sizerequired);
-
-		Irp->IoStatus.Status = NtStatus;
-		Irp->IoStatus.Information = sizerequired;
-	}
-	else {
-		Irp->IoStatus.Status = NtStatus;
-		Irp->IoStatus.Information = 0;
-	}
-	*/
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
 	return NtStatus;
@@ -193,9 +146,8 @@ NTSTATUS NotSupported(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	UNREFERENCED_PARAMETER(DeviceObject);
 	char msg[128];
 	sprintf(msg, "Not supported I/O operation (Flags: %lu)", Irp->Flags);
-
-	//debug("Not Supported I/O operation");
 	debug(msg);
+
 	Irp->IoStatus.Status = STATUS_NOT_SUPPORTED;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	status = STATUS_NOT_SUPPORTED;
