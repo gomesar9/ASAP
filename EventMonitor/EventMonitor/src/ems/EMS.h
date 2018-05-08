@@ -2,9 +2,20 @@
 #include "../config.h"
 #include <intrin.h>
 
+// --+-- DEBUG --+--
+#define IA32_PMC0 0
+#define GLOBAL_STATUS_PEBS_OVF 1ull<<62
+#define GLOBAL_STATUS_OVF_PC0 1
+// ^^^^^ DEBUG ^^^^^
+
 #define EMS_CMD_MAX_LENGTH 4
-#define MAX_INTERRUPTS 500
-#define _PERIOD 100000ull	// Event to arm PEBS one time (unsigned long long)
+#define MAX_INTERRUPTS 5
+#ifdef DEBUG_DEV
+	#define _PERIOD 0xFFFFull	// Easy to verify
+#else
+	#define _PERIOD 100000ull	// Event to arm PEBS one time (unsigned long long)
+#endif
+#define NEHALEM_NEW_FIELDS 1
 
 /*
 */
@@ -26,7 +37,9 @@ typedef struct st_PEBSBUFFER {
 	UINT64
 		RFLAGS, RIP, RAX, RBX, RCX,
 		RDX,	RSI, RDI, RBP, RSP,
-		R8, R9, R10, R11, R12, R13, R14, R15;
+		R8, R9, R10, R11, R12, R13, R14, R15,
+		IA32_PERF_GLOBAL_ST, DATA_LINEAR_ADDR,
+		DATA_SOURCE_ENCODING, LATENCY_VALUE;
 }TPEBS_BUFFER, *PTPEBS_BUFFER;
 
 typedef struct st_DSBASE {
@@ -43,6 +56,13 @@ typedef struct st_DSBASE {
 		PEBS_INDEX,
 		PEBS_MAXIMUM,
 		PEBS_THRESHOLD;
+	UINT64 PEBS_CTR0_RST;
+#ifdef NEHALEM_NEW_FIELDS
+	UINT64
+		PEBS_CTR1_RST,
+		PEBS_CTR2_RST,
+		PEBS_CTR3_RST;
+#endif
 }TDS_BASE, *PTDS_BASE;
 /* #################################################
  ###################################################
@@ -93,8 +113,10 @@ NTSTATUS sample(PANSI_STRING info);
 #define DISABLE_PEBS 0
 #define ENABLE_PEBS 1
 
-// Limit
-#define PERIOD ULLONG_MAX - _PERIOD
+// Limi
+// Only 48bits setted
+#define PERIOD (ULLONG_MAX - _PERIOD) & 0x0000FFFFFFFFFFFF
+//#define PEBS_CTR0_RST_VALUE _PERIOD 
 
 #define EVTSEL_EN 1<<22
 #define EVTSEL_USR 1<<16
@@ -113,7 +135,7 @@ NTSTATUS sample(PANSI_STRING info);
 
 //#define PEBS_EVENT 0x1c2
 
-#define MSR_DS_AREA 1536
+#define MSR_DS_AREA 0x600// 1536
 
 /*
  Functions

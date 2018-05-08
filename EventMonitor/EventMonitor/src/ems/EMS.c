@@ -251,28 +251,99 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	MmUnmapIoSpace(APIC, sizeof(UINT32));
 
 	// TODO: PROCESS
-	INTERRUPTS += 1;
-	//char msg[128];
-	//sprintf(msg, "(%d) RAX: %lld", INTERRUPTS, DS_BASE->PEBS_BUFFER_BASE->RAX);
-	//debug(msg);
-	
+#ifdef DEBUG_DEV //--------------------------------------------------------------------
+	char _msg[128];
+	UINT64 pmc0, perf_ctr0, perf_global_status;
+	PTDS_BASE tmp;
+
+	sprintf(_msg, "----- [PMI] %d -----", INTERRUPTS);
+	debug(_msg);
+
+	sprintf(_msg, "[PMI]IA32_PERF_GLOBAL_ST: %lld", (DS_BASE->PEBS_BUFFER_BASE+INTERRUPTS)->IA32_PERF_GLOBAL_ST);
+	debug(_msg);
+#else //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	char msg_bfr[BFR_SIZE];
-	sprintf(msg_bfr, "INTERRUPT: %d\0", INTERRUPTS);
+	sprintf(msg_bfr, "[PMI]INTERRUPT: %d\0", INTERRUPTS);
 	bfr_set(msg_bfr);
+	debug(msg_bfr);
+#endif
 
-	bfr_tick();
+	// Increment interrupt counter
+	INTERRUPTS += 1;	// Test (control)
+	bfr_tick();			// IO data
 
-	// TODO: Re-enable PEBS in near future
+	// Re-enable PEBS
 	if (INTERRUPTS < MAX_INTERRUPTS) {
-		//fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
-		DS_BASE->PEBS_BUFFER_BASE = PEBS_BUFFER;
-		DS_BASE->PEBS_INDEX = PEBS_BUFFER;	// Reset index
+		//DS_BASE->PEBS_BUFFER_BASE = PEBS_BUFFER;	// Theoretically not necessary
 
-		// Enable PEBS
+#ifdef DEBUG_DEV //--------------------------------------------------------------------
+		// --+-- DEBUG --+--
+		// Misbehavior: Always pointing to PEBS_BUFFER_BASE
+		sprintf(_msg, "[PMI]PEBS->PEBS_INDEX: %p", DS_BASE->PEBS_INDEX);
+		debug(_msg);
+
+		// MSR_IA32_PERFCTR0 and PMC0 should be 0 or 1 at this point
+		// Supposing that DS_BASE->PEBS_CTR0_RST is working correctly, I am not sure if 
+		// the reset value is putted in PMC0 before interruption..
+		perf_ctr0 = __readmsr(MSR_IA32_PERFCTR0);
+		sprintf(_msg, "[PMI]MSR_IA32_PERFCTR0: %llx", perf_ctr0);
+		debug(_msg);
+
+		pmc0 = __readpmc(IA32_PMC0);
+		sprintf(_msg, "[PMI]PMC0: %llx", pmc0);
+		debug(_msg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+		/*
+		* Index reset was disabled aiming see the complete PEBS sequence,
+		* that is starting, threshold, and reach ABS_MAX.
+		* Considering PEBS Buffer with 5 records
+		* Registers:	[0 1 2 3 4]
+		* Events:		 S - I T - M
+		* S: Start, I: Threshold interruption, T: Threshold Pointer, M: Abs Max
+		* 
+		* I should be invoked with PEBS_Ovf flag setted after Register[2] is writted, because 
+		*   threshold is pointing to register[3]
+		* M should stop PEBS without invoke interruption. (Points to the first byte after PEBS Buffer)
+		*/
+		//DS_BASE->PEBS_INDEX = DS_BASE->PEBS_BUFFER_BASE;	// Reset index
+
+		// --+-- Enable PEBS --+--
 		__writemsr(MSR_IA32_PERFCTR0, PERIOD);
 		__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
 		__writemsr(MSR_IA32_GLOBAL_CTRL, ENABLE_PEBS);
+#ifdef DEBUG_DEV //--------------------------------------------------------------------
+	} else {
+		// Last Interrupt
+		// Ensures that read value comes from MSR_DS_AREA (discarding pointer mistakes)
+		tmp = (PTDS_BASE)__readmsr(MSR_DS_AREA);
+
+		sprintf(_msg, "[PMI]tmp->PEBS_INDEX: %p", tmp->PEBS_INDEX);
+		debug(_msg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	}
+
+#ifdef DEBUG_DEV //--------------------------------------------------------------------
+	// --+-- DEBUG --+--
+	perf_ctr0 = __readmsr(MSR_IA32_PERFCTR0);
+	sprintf(_msg, "[PMI]MSR_IA32_PERFCTR0: %llx", perf_ctr0);
+	debug(_msg);
+
+	perf_global_status = __readmsr(MSR_IA32_GLOAL_STATUS);
+	//sprintf(_msg, "[PMI]PERF_GLOBAL_STATUS: %llu", perf_global_status);
+	//debug(_msg);
+
+	if (perf_global_status & GLOBAL_STATUS_PEBS_OVF) {
+		debug("[PMI]PEBS_Ovf setted. Cleaning..");
+		// PEBS assists microcode already clear this after write on PEBS record
+		//__writemsr(MSR_IA32_GLOBAL_OVF_CTRL, GLOBAL_STATUS_PEBS_OVF);	// Clear bit PEBS_Ovf
+	}
+
+	if (perf_global_status & GLOBAL_STATUS_OVF_PC0) {
+		debug("[PMI]OVF_PC0 setted. Cleaning..");
+		//__writemsr(MSR_IA32_GLOBAL_OVF_CTRL, GLOBAL_STATUS_OVF_PC0);	// Clear bit OVF_PC0 (Programmable counter 0)
+	}
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 }
 
 // Hook Handles
@@ -298,9 +369,10 @@ VOID hook_handler() {
 		sizeof(PVOID*),
 		&perfmon_hook.Pointer
 	);
-	char msg[126];
-	sprintf(msg, "HOOK_HANDLER: ST:%X. F:%p", st, perfmon_hook.Pointer);
-	debug(msg);
+
+	//char msg[126];
+	//sprintf(msg, "HOOK_HANDLER: ST:%X. F:%p", st, perfmon_hook.Pointer);
+	//debug(msg);
 }
 
 /*
@@ -331,8 +403,31 @@ VOID thread_attach_to_core(uintptr_t id) {
 VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer) {
 	ds_base->PEBS_BUFFER_BASE = pebs_buffer;
 	ds_base->PEBS_INDEX = pebs_buffer;
-	ds_base->PEBS_MAXIMUM = pebs_buffer+1;
-	ds_base->PEBS_THRESHOLD = pebs_buffer;
+#ifdef DEBUG_DEV
+	ds_base->PEBS_MAXIMUM = pebs_buffer + MAX_INTERRUPTS;
+	ds_base->PEBS_THRESHOLD = pebs_buffer + 2; // TODO: adjust
+#else
+	ds_base->PEBS_MAXIMUM = pebs_buffer + 1;
+	ds_base->PEBS_THRESHOLD = pebs_buffer;	// Inactive, I think..
+#endif
+	ds_base->PEBS_CTR0_RST = PERIOD;
+#ifdef NEHALEM_NEW_FIELDS
+	ds_base->PEBS_CTR1_RST = PERIOD;
+	ds_base->PEBS_CTR2_RST = PERIOD;
+	ds_base->PEBS_CTR3_RST = PERIOD;
+#endif
+
+#ifdef DEBUG_DEV
+	char _msg[128];
+	sprintf(_msg, "SIZEOF TPEBS_BUFFER: %Id", sizeof(TPEBS_BUFFER));
+	debug(_msg);
+	sprintf(_msg, "DS_BASE  : %p", DS_BASE->PEBS_BUFFER_BASE);
+	debug(_msg);
+	sprintf(_msg, "PEBS_TRHD: %p", ds_base->PEBS_THRESHOLD);
+	debug(_msg);
+	sprintf(_msg, "PEBS_CTR0_RST: %llx", ds_base->PEBS_CTR0_RST);
+	debug(_msg);
+#endif
 }
 
 VOID StarterThread(_In_ PVOID StartContext) {
@@ -340,15 +435,30 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	// Get core information (number)
 	core = (uintptr_t)StartContext;
 
-	debug("Thread Iniciada");
-
 	// Attach thread to core
 	thread_attach_to_core(core);
 
 	// Allocate structs and buffers
-	DS_BASE = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), 'DSB');
-	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, sizeof(PTPEBS_BUFFER), 'PBF');
+	//DS_BASE = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), 'DSB');
+	//PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, 5*sizeof(TPEBS_BUFFER), 'PBF');
+	DS_BASE = (PTDS_BASE)ExAllocatePool(NonPagedPool, sizeof(TDS_BASE));
+	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePool(NonPagedPool, MAX_INTERRUPTS * sizeof(TPEBS_BUFFER));
+
 	fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
+	LARGE_INTEGER pa;
+	UINT32 *APIC;
+	pa.QuadPart = PERF_COUNTER_APIC;
+	/*
+	NTKERNELAPI PVOID MmMapIoSpace(
+	PHYSICAL_ADDRESS	PhysicalAddress,
+	SIZE_T				NumberOfBytes,
+	MEMORY_CACHING_TYPE	CacheType
+	);
+	*/
+	APIC = (UINT32*)MmMapIoSpace(pa, sizeof(UINT32), MmNonCached);
+	*APIC = ORIGINAL_APIC_VALUE;
+	MmUnmapIoSpace(APIC, sizeof(UINT32));
+
 	__writemsr(MSR_DS_AREA, (UINT_PTR)DS_BASE);
 
 	// --+-- Enable mechanism --+--
@@ -357,6 +467,14 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	
 	// Set threshold (counter) and events
 	__writemsr(MSR_IA32_PERFCTR0, PERIOD);
+	// IA32_PMC0 = 0
+	char _msg[64];
+	UINT64 pmc0 = __readpmc(0);
+	sprintf(_msg, "PMC0: %llx", pmc0);
+	debug(_msg);
+	pmc0 = __readmsr(MSR_IA32_PERFCTR0);
+	sprintf(_msg, "MSR_IA32_PERFCTR0: %llx", pmc0);
+	debug(_msg);
 	//__writemsr(MSR_IA32_EVNTSEL0, PEBS_EVENT | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
 	TEPEBS_EVENTS _evt = _PE_BR_MISP_ALL_BRANCHES;
 	__writemsr(MSR_IA32_EVNTSEL0, _evt | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
@@ -385,8 +503,10 @@ VOID StopperThread(_In_ PVOID StartContext) {
 	unhook_handler();
 
 	// Free allocated memory
-	ExFreePoolWithTag(PEBS_BUFFER, 'PBF'); // Buffer
-	ExFreePoolWithTag(DS_BASE, 'DSB');	// Struct
+	//ExFreePoolWithTag(PEBS_BUFFER, 'PBF'); // Buffer
+	//ExFreePoolWithTag(DS_BASE, 'DSB');	// Struct
+	ExFreePool(PEBS_BUFFER); // Buffer
+	ExFreePool(DS_BASE);	// Struct
 
 	debug("Thread stopped. Resources FREE");
 }
