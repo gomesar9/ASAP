@@ -31,12 +31,13 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	datasize = PIO_STACK_IRP->Parameters.Write.Length;
 
 	// Reading
-	if (datasize == EMS_CMD_MAX_LENGTH) {
-		cmdBfr = ExAllocatePoolWithTag(NonPagedPoolNx, EMS_CMD_MAX_LENGTH, 'CMD');
+	if (datasize < EMS_CMD_MAX_LENGTH + EMS_OPT_MAX_LENGTH) {
+		// TODO: Remove dynamic allocation. Use PCHAR
+		cmdBfr = ExAllocatePoolWithTag(NonPagedPoolNx, EMS_OPT_MAX_LENGTH, 'CMD');
 		memcpy(cmdBfr, userbuffer, datasize);
 
-		RtlInitEmptyAnsiString(&cmd, cmdBfr, (USHORT) EMS_CMD_MAX_LENGTH);
-		cmd.Length = (USHORT) datasize;
+		RtlInitEmptyAnsiString(&cmd, cmdBfr, (USHORT)EMS_OPT_MAX_LENGTH);
+		cmd.Length = (USHORT)datasize;
 
 		sprintf(msg, "IO: msg received: %s", cmd.Buffer);
 		debug(msg);
@@ -44,7 +45,10 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 		NtStatus = execute(&cmd);
 		ExFreePoolWithTag(cmdBfr, 'CMD');
 		Irp->IoStatus.Status = NtStatus;
-	}	
+	} else {
+		debug("[!] CMD buffer overflow");
+		return STATUS_BUFFER_OVERFLOW;
+	}
 	
 	Irp->IoStatus.Status = NtStatus;
 	Irp->IoStatus.Information = sizerequired;
@@ -56,19 +60,19 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 }
 
 /* Write data from driver to the userland stack */
-NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
-{
+NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
+	UNREFERENCED_PARAMETER(DeviceObject);
 	//debug("IO::Read : Entered");
 	//TBTS_BUFFER bdata;
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
 	UINT32 datasize;//, sizerequired;
 	size_t sizerequired;
-	UNREFERENCED_PARAMETER(DeviceObject);
 
 #ifdef REFAC
 	ULONGLONG _count;
-	char buff[BFR_SIZE];
+	CHAR buff[BFR_SIZE];
+	INT return_code;
 #else
 	char buff[BFR_SIZE];
 #endif
@@ -78,9 +82,12 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	datasize = PIO_STACK_IRP->Parameters.Read.Length;
 
 	// --+-- BAND-AID --+--
-	count_get(&_count);
-	//int resp = 0;
-	sprintf(buff, "%llu", _count);
+	return_code = count_get(&_count);
+	if (return_code == 0) {
+		sprintf(buff, "%llu", _count);
+	} else {
+		sprintf(buff, "%d", -1);
+	}
 	
 	
 #ifdef DEBUG

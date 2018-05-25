@@ -12,18 +12,111 @@ int bfr_create() {
 	BFR = ExAllocatePoolWithTag(NonPagedPoolNx, BFR_BYTE_SIZE, 'RFB');
 	memset(BFR, '\0', BFR_BYTE_SIZE);
 	BFR2 = 0;
-
+#ifdef REFAC
+	TAIL = 0;
+	HEAD = 0;
+	SAMPLES0.used = FALSE;
+	SAMPLES1.used = FALSE;
+	SAMPLES2.used = FALSE;
+#endif
 	return 0;
 }
 
 #ifdef REFAC
-void bfr_tick() {
+VOID bfr_tick() {
+	/*
+	Accessed by Extractor
+	*/
+
+	// TODO: Write on buffer n.{HEAD};
+	switch (HEAD) {
+	case 0:
+		if (SAMPLES0.used) {
+			debug("[SMPL] ZRO IN USE!!");
+		} else {
+			SAMPLES0.count[0] = 100;
+			SAMPLES0.time[0] = 100;
+			SAMPLES0.used = TRUE;
+			HEAD++;
+		}
+		break;
+	case 1:
+		if (SAMPLES1.used) {
+			debug("[SMPL] ONE IN USE!!");
+		} else {
+			SAMPLES1.count[0] = 200;
+			SAMPLES1.time[0] = 101;
+			SAMPLES1.used = TRUE;
+			HEAD++;
+		}
+		break;
+	case 2:
+		if (SAMPLES2.used) {
+			debug("[SMPL] TWO IN USE!!");
+		} else {
+			SAMPLES2.count[0] = 300;
+			SAMPLES2.time[0] = 102;
+			SAMPLES2.used = TRUE;
+			HEAD = 0;
+		}
+		break;
+	default:
+		break;
+	}
 	BFR2 += _PERIOD;
 }
 
-void count_get(_Out_ PULONGLONG count) {
-	*count = BFR2;
+INT count_get(_Out_ PULONGLONG count) {
+	/*
+	Accessed by IO
+	*/
+	char _msg[128];
+
+	switch (TAIL) {
+	case 0 :
+		if (SAMPLES0.used) {
+			sprintf(_msg, "[SMPL] ZRO: (%d, %d)", SAMPLES0.count[0], SAMPLES0.time[0]);
+			debug(_msg);
+			SAMPLES0.used = FALSE;
+			// Just for example
+			*count = SAMPLES0.count[0];
+
+			TAIL++;
+			return 0;
+		}
+		break;
+	case 1:
+		if (SAMPLES1.used) {
+			sprintf(_msg, "[SMPL] ONE: (%d, %d)", SAMPLES1.count[0], SAMPLES1.time[0]);
+			debug(_msg);
+			SAMPLES1.used = FALSE;
+			// Just for example
+			*count = SAMPLES1.count[0];
+
+			TAIL++;
+			return 0;
+		}
+		break;
+	case 2:
+		if (SAMPLES2.used) {
+			sprintf(_msg, "[SMPL] TWO: (%d, %d)", SAMPLES2.count[0], SAMPLES2.time[0]);
+			debug(_msg);
+			SAMPLES2.used = FALSE;
+			// Just for example
+			*count = SAMPLES2.count[0];
+
+			TAIL = 0;
+			return 0;
+		}
+		break;
+	default:
+		break;
+	}
+	//*count = BFR2;
 	BFR2 = 0;
+
+	//  count not modified
+	return 1;
 }
 #endif
 

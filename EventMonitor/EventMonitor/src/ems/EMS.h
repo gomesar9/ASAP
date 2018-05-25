@@ -8,31 +8,30 @@
 #define GLOBAL_STATUS_OVF_PC0 1
 // ^^^^^ DEBUG ^^^^^
 
+#define NEHALEM_NEW_FIELDS 1
 #define EMS_CMD_MAX_LENGTH 4
-#define MAX_INTERRUPTS 5
+#define EMS_OPT_MAX_LENGTH 28
+#define MAX_INTERRUPTS 50
 #ifdef DEBUG_DEV
 	#define _PERIOD 0xFFFFull	// Easy to verify
 #else
-	#define _PERIOD 100000ull	// Event to arm PEBS one time (unsigned long long)
+	#define _PERIOD 900000ull	// Event to arm PEBS one time (unsigned long long)
 #endif
-#define NEHALEM_NEW_FIELDS 1
 
 /*
+ ########################################################
+ ### PART I
 */
 typedef union st_TRICK {
 	PVOID Pointer;
 	VOID(*Function) (__in struct _KINTERRUPT *, __in PVOID);
 } TFUNC_POINTER, *PTFUNC_POINTER;
-/* #################################################
- BTS struct
-*/
+
 typedef struct st_BTSBUFFER {
 	UINT64 FROM, TO, MISC;
 }TBTS_BUFFER, *PTBTS_BUFFER;
 
-/*
- PEBS struct
-*/
+// PEBS struct
 typedef struct st_PEBSBUFFER {
 	UINT64
 		RFLAGS, RIP, RAX, RBX, RCX,
@@ -64,16 +63,18 @@ typedef struct st_DSBASE {
 		PEBS_CTR3_RST;
 #endif
 }TDS_BASE, *PTDS_BASE;
-/* #################################################
- ###################################################
+
+/*
+########################################################
+### PART II
 */
 
 /* Enums */
 typedef enum _EM_CMD_TYPE {
-	EM_CMD_START,
-	EM_CMD_SET,
-	EM_CMD_STOP,
-	EM_CMD_NULL
+	EM_CMD_START,	// 00
+	EM_CMD_CFG,		// 01
+	EM_CMD_STOP,	// 02
+	EM_CMD_NULL		// 03
 }EM_CMDTYPE, *PEM_CMDTYPE;
 
 // Enum (options) for EM_CMD_START
@@ -85,35 +86,35 @@ typedef enum _START_CFG {
 }START_CFG, *PSTART_CFG;
 
 // Enum (options) for EM_CMD_SET
-typedef enum _EM_EVENT {
-	EM_EVT_CACHE_SS,
-	EM_EVT_BRANCH_SS,
-	EM_EVT_NULL
-}EM_EVENT, *PEM_EVENT;
+typedef enum _EM_SUBTYPE {
+	EM_CFG_EVT,			// 00
+	EM_CFG_INTERRUPT,	// 01
+	EM_CFG_THRESHOLD,	// 02
+	EM_EVT_NULL			// 03
+}EM_SUBTYPE, *PEM_SUBTYPE;
 
 /* Structs */
 typedef struct st_EM_CMD {
 	EM_CMDTYPE Type;
-	EM_EVENT Event;
+	EM_SUBTYPE Event;
+	INT Opt1, Opt2;
 }TEM_CMD, *PTEM_CMD;
 
 typedef struct st_EM_SAMPLE {
-	EM_EVENT Event;
+	EM_SUBTYPE Event;
 	ULONG Counter;
 	PCHAR Info;
 }EM_SAMPLE, *PEM_SAMPLE;
 
-//NTSTATUS bfr_create();
-NTSTATUS _unpack(const PANSI_STRING cmd, PTEM_CMD emCmd);
-NTSTATUS execute(const PANSI_STRING cmd);
-NTSTATUS sample(PANSI_STRING info);
-//NTSTATUS bfr_destroy();
-
+/*
+########################################################
+### PART III
+*/
 
 #define DISABLE_PEBS 0
 #define ENABLE_PEBS 1
 
-// Limi
+// Limit
 // Only 48bits setted
 #define PERIOD (ULLONG_MAX - _PERIOD) & 0x0000FFFFFFFFFFFF
 //#define PEBS_CTR0_RST_VALUE _PERIOD 
@@ -137,19 +138,12 @@ NTSTATUS sample(PANSI_STRING info);
 
 #define MSR_DS_AREA 0x600// 1536
 
-/*
- Functions
-*/
-VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext);
-VOID hook_handler();
-VOID unhook_handler();
-VOID thread_attach_to_core(uintptr_t id);
-VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer);
-VOID StarterThread(_In_ PVOID StartContext);
-VOID StopperThread(_In_ PVOID StartContext);
+
 
 /* TODO: Move to separated header file */
 typedef enum EPEBS_EVENTS {
+	_PE_INVALID_EVENT	= 0x0,
+	//
 	_PE_MEM_INST_RET_LOADS			= 0x010B,
 	_PE_MEM_INST_RET_STORES			= 0x020B,
 	_PE_MEM_INST_RET_LAT_ABOV_THS	= 0x100b,
@@ -207,3 +201,27 @@ typedef enum EPEBS_EVENTS {
 	_PE_FP_ASSISTS_OUTPUT	= 0x02F7,
 	_PE_FP_ASSISTS_INPUT	= 0x04F7
 }TEPEBS_EVENTS, *PTEPEBS_EVENTS;
+
+#define _NUM_EVENTS 44
+#define CFG_INVALID_EVENT_CODE 0
+typedef struct _UPEBS_EVENT {
+	UINT32 Code;
+	TEPEBS_EVENTS Event;
+}TPEBS_EVT_MAP, *PTPEBS_EVT_MAP;
+
+/*
+Functions
+*/
+NTSTATUS _unpack(CONST PANSI_STRING cmd, PTEM_CMD emCmd);
+NTSTATUS execute(CONST PANSI_STRING cmd);
+//NTSTATUS sample(PANSI_STRING info);
+
+VOID initialize_em();
+VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext);
+VOID hook_handler();
+VOID unhook_handler();
+VOID thread_attach_to_core(uintptr_t id);
+VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer);
+VOID StarterThread(_In_ PVOID StartContext);
+VOID StopperThread(_In_ PVOID StartContext);
+BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap);

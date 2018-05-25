@@ -47,8 +47,9 @@ DriverEntry (
     NTSTATUS status = STATUS_SUCCESS;
 
     UNREFERENCED_PARAMETER( RegistryPath );
-
+#ifdef DEBUG_DEV //--------------------------------------------------------------------
 	debug("DriverEntry: Entered");
+#endif //------------------------------------------------------------------------------
 
 	DriverObject->DriverUnload = EventMonitorUnload;
 

@@ -2,6 +2,13 @@
 #include "../io/IO.h"
 
 /* 
+- V.0.3, 25/05/2018:
+  - Supports dynamic configuration of:
+    - Threshold
+	- Interruptions
+	- Events
+  - Refactor:
+    - Flags in bits of UINT32 structure
 - V.0.2a, 03/05/2018:
   - Supports PEBS re-enable
   - Supports all PEBS events listed in Nehalem Performance Monitoring Unit Programming Guide (Enum)
@@ -13,7 +20,7 @@ NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject)
 	NTSTATUS status;
 	PDEVICE_OBJECT dev;
 	UNICODE_STRING namestring, linkstring;
-	debug("Creating Device V.0.2a");
+	debug("Creating Device V.0.3");
 
 	RtlInitUnicodeString(&namestring, DRIVERNAME);
 	status = IoCreateDevice(DriverObject, 0, &namestring, FILE_DEVICE_DISK_FILE_SYSTEM, FILE_DEVICE_SECURE_OPEN, FALSE, &dev);
