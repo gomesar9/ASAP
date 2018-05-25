@@ -253,7 +253,7 @@ class EMShell():
     def __init__(self, config_file='project.cfg', debug=False):
         self.debug = debug
         self.tmp = config_file
-        self.em = EventMonitor(verbose=True, debug=True)
+        self.em = EventMonitor(verbose=True, debug=False)
         self.cl = Client(debug=False)
         self.__cmds = {
                 "install": self.__install,
@@ -262,7 +262,9 @@ class EMShell():
                 "interrogate": self.__interrogate,
                 "read": self.__read,
                 "write": self.__i_write,
-                "?": self.__help
+                "?": self.__help,
+                "h": self.__help,
+                "help": self.__help
                 }
         self.__cl_connected = False
         self.__em_started = False
@@ -273,7 +275,7 @@ class EMShell():
 
 
     def __help(self):
-        print("Commands: install, start, stop, interrogate, read, write, exit")
+        print("Commands: install, start, stop, interrogate, read, write, exit.")
         print("It is not necessary to run 'start' before 'write'/'read', either 'stop' before 'exit'.")
 
 
@@ -333,9 +335,46 @@ class EMShell():
         if not self.__cl_connected:
             self.__connect()
 
+        TAGS = {
+            "evt": ["Set Event. Requires Int. Ex: 'evt 23'.", "0100"],
+            "itr": ["Set Interruption. Requires Int. Ex: 'itr 10'.", "0101"],
+            "thr": ["Set Threshold. Requires Int. Ex: 'thr 1000'.", "0102"],
+            "on":  ["Enable PEBS (core 1).", "0001"],
+            "off": ["Disable PEBS (core 1).", "0201"],
+            "branch_all": ["EVENT: Instructions Retired Branch All.", "23"],
+            "retired_all": ["EVENT: Instructions Retired All.", "13"]
+        }
+        print("WRITING MODE ([h|help|?] for help, [q|exit|quit] to quit)")
+        print("The following words (inside []) will be replaced by codes.")
+        
+        for w, c in TAGS.items():
+            print('  [{}]: "{}" (C:{})'.format(w, c[0], c[1]))
+        print("evt, itr and thr must be configured before run. Type 'example' to get one execution example.")
         try:
-            msg = input("msg>")
-            self.cl.write(msg)
+            f_exit = False
+            while not f_exit:
+                msg = input("msg>").lower()
+                if msg.lower() in ("h", "?", "help"):
+                    print("The following words (inside []) will be replaced by codes.")
+                    for w, c in TAGS.items():
+                        print('  [{}]: "{}" (C:{})'.format(w, c[0], c[1]))
+                    print("evt, itr and thr must be configured before run. Type 'example' to get one execution example.")
+                elif msg.lower() in ("q", "quit", "exit"):
+                    f_exit = True
+                elif msg.lower() == "example":
+                    print("Example:")
+                    print("  msg>evt branch_all")
+                    print("  msg>itr 3")
+                    print("  msg>thr 10000")
+                    print("  msg>on")
+                else:
+                    # Do replacement
+                    for word in msg.split():
+                        if word.lower() in TAGS.keys():
+                            msg = msg.replace(word, TAGS[word.lower()][1])
+                    print(" |-sending: '{}'.".format(msg) )
+                    self.cl.write(msg)
+            
         except Exception as e:
             print(str(e))
 
@@ -350,12 +389,12 @@ class EMShell():
 
     def menu(self):
         print("[EventMonitorShell]")
-        print("[V] ? for help")
+        print("'h' for help, 'exit' for quit")
         try:
             cmd = None
-            while cmd != "exit":
+            while cmd != "exit" and cmd!= "quit":
                 print("")
-                cmd = input("[EMS]> ")
+                cmd = input("[EMS]> ").lower()
 
                 if cmd in self.__cmds:
                     if self.debug:
