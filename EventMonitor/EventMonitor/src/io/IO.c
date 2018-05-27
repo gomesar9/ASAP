@@ -22,8 +22,8 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	CHAR msg[128];
 	NTSTATUS NtStatus = STATUS_SUCCESS;
 	// --+-- EMC use --+--
-	ANSI_STRING cmd;
-	PCHAR cmdBfr;
+	CHAR _cmdBfr[EMS_BUFFER_MAX_LENGHT + 1];
+	memset(_cmdBfr, '\0', EMS_BUFFER_MAX_LENGHT * sizeof(char)); // For sure..
 	
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
 
@@ -31,19 +31,15 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	datasize = PIO_STACK_IRP->Parameters.Write.Length;
 
 	// Reading
-	if (datasize < EMS_CMD_MAX_LENGTH + EMS_OPT_MAX_LENGTH) {
-		// TODO: Remove dynamic allocation. Use PCHAR
-		cmdBfr = ExAllocatePoolWithTag(NonPagedPoolNx, EMS_OPT_MAX_LENGTH, 'CMD');
-		memcpy(cmdBfr, userbuffer, datasize);
+	if (datasize < EMS_BUFFER_MAX_LENGHT) {
+		memcpy(_cmdBfr, userbuffer, datasize);
+		_cmdBfr[EMS_BUFFER_MAX_LENGHT] = '\0'; // Assurance
 
-		RtlInitEmptyAnsiString(&cmd, cmdBfr, (USHORT)EMS_OPT_MAX_LENGTH);
-		cmd.Length = (USHORT)datasize;
-
-		sprintf(msg, "IO: msg received: %s", cmd.Buffer);
+		sprintf(msg, "IO: msg received: %s (%u).", _cmdBfr, datasize);
 		debug(msg);
 
-		NtStatus = execute(&cmd);
-		ExFreePoolWithTag(cmdBfr, 'CMD');
+		NtStatus = execute(_cmdBfr, (UINT16) datasize);
+		
 		Irp->IoStatus.Status = NtStatus;
 	} else {
 		debug("[!] CMD buffer overflow");

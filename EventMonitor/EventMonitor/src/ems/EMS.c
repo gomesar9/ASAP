@@ -1,5 +1,6 @@
 #include "EMS.h"
 #include "../bfr/buffer.h"
+#include "../clt/collector.h"
 
 /*
  * void __writemsr(
@@ -15,13 +16,16 @@ UINT32 INTERRUPTS = 0;		// Interruptions count
 UINT32 CFG_INTERRUPT;		// Max interrupts
 TPEBS_EVT_MAP CFG_EVENT;	// PEBS Event Code
 UINT32 CFG_THRESHOLD;		// Events to trigger one interruption
-HANDLE thandle;				// Thread Handle
+HANDLE thandle;				// Thread Handle to PEBS
+HANDLE thandleCollector;	// Thread handle to Collector
 PTDS_BASE DS_BASE;			// PEBS Base
 PTPEBS_BUFFER PEBS_BUFFER;	// PEBS Buffer
-#ifdef SIMULATION
-ULONG emsSeed = 1337;		// Seed for simulation random numbers
-#endif
+KSPIN_LOCK LOCK_INTERRUPT;	// Spin Lock for INTERRUPTS
 
+
+UINT32 get_cfg_interrupt() {
+	return CFG_INTERRUPT;
+}
 
 VOID initialize_em() {
 	CFG_EVENT.Code = CFG_INVALID_EVENT_CODE;
@@ -29,6 +33,15 @@ VOID initialize_em() {
 	CFG_THRESHOLD = 0;
 	CFG_INTERRUPT = 0;
 	INTERRUPTS = 0;
+	KeInitializeSpinLock(&LOCK_INTERRUPT);
+}
+
+VOID get_interrupts(_Out_ PUINT32 collect) {
+	KIRQL old;
+	ExAcquireSpinLock(&LOCK_INTERRUPT, &old);
+	*collect = INTERRUPTS;
+	INTERRUPTS = 0;
+	KeReleaseSpinLock(&LOCK_INTERRUPT, old);
 }
 
 typedef enum _INFOS{
@@ -61,15 +74,29 @@ void to_buffer(int info){
 	bfr_set(msg_bfr);
 }
 
-NTSTATUS _unpack(CONST PANSI_STRING cmd, PTEM_CMD emCmd) {
-	NTSTATUS st = STATUS_SUCCESS;
+NTSTATUS stop_pebs(_In_ INT core) {
+	NTSTATUS st;
+	st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StopperThread, (VOID*)core);
+
+	clearFlag(F_EM_PEBS_ACTIVE);
+
+	// uninstall hook after stop Thread
+	unhook_handler();
 	
+	//INTERRUPTS = 0; // TODO: Make vector for multiple cores
+
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS _unpack(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _Out_ PTEM_CMD emCmd, _In_ UINT16 datasize) {
+	NTSTATUS st = STATUS_SUCCESS;
+
 	char chunk[2];
-	int num, state=0;
+	int num, state = 0;
 
 	//while ((state * 2) + 1 < cmd->Length) {
 	while ((state * 2) + 1 < EMS_CMD_MAX_LENGTH) {
-		strncpy(chunk, &(cmd->Buffer[state*2]), 2);
+		strncpy(chunk, &(cmd[state * 2]), 2);
 		num = atoi(chunk);
 
 		switch (state)
@@ -91,9 +118,9 @@ NTSTATUS _unpack(CONST PANSI_STRING cmd, PTEM_CMD emCmd) {
 		int idx = 0;
 		char _bff[64];
 		state = EMS_CMD_MAX_LENGTH + 1; // Assurance.
-		
-		while (cmd->Buffer[state] != ' ' && state < cmd->Length && idx < 63) {
-			_bff[idx++] = cmd->Buffer[state++];
+
+		while (cmd[state] != ' ' && state < datasize && idx < 63) {
+			_bff[idx++] = cmd[state++];
 		}
 		_bff[idx] = '\0'; // Assurance
 		if (idx > 0) {
@@ -110,7 +137,7 @@ NTSTATUS _unpack(CONST PANSI_STRING cmd, PTEM_CMD emCmd) {
 			return STATUS_MESSAGE_NOT_FOUND;
 		}
 	}
-	
+
 	/*
 	emCmd->Type = EM_CMD_SET;
 	emCmd->Event = EM_EVT_CACHE_SS;
@@ -119,17 +146,16 @@ NTSTATUS _unpack(CONST PANSI_STRING cmd, PTEM_CMD emCmd) {
 	return st;
 }
 
-
-NTSTATUS execute(CONST PANSI_STRING cmd) {
+NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 	NTSTATUS st = STATUS_SUCCESS, CHANGE_ME = STATUS_FAIL_CHECK;
 	TEM_CMD emCmd;
 	char dbgMsg[64];
 
-	st = _unpack(cmd, &emCmd);
+	st = _unpack(cmd, &emCmd, datasize);
 	if (!NT_SUCCESS(st)) {
 		return st;
 	}
-	
+
 	if (emCmd.Type == EM_CMD_CFG) {
 		// ############################################################
 		// ### COMMAND CHANGE #########################################
@@ -139,7 +165,7 @@ NTSTATUS execute(CONST PANSI_STRING cmd) {
 
 		switch (emCmd.Event) {
 		case EM_CFG_EVT:
-			if ( checkFlag(F_EM_PEBS_ACTIVE) ) {
+			if (checkFlag(F_EM_PEBS_ACTIVE)) {
 				debug("[!EXC] CANNOT change Event while PEBS active.");
 				return CHANGE_ME;
 			}
@@ -147,7 +173,7 @@ NTSTATUS execute(CONST PANSI_STRING cmd) {
 			sprintf(dbgMsg, "[EXC] EM_CFG_EVT: %u.", emCmd.Opt1);
 			debug(dbgMsg);
 			CFG_EVENT.Code = emCmd.Opt1;
-			if ( ! getPEBSEvt(&CFG_EVENT) ) {
+			if (!getPEBSEvt(&CFG_EVENT)) {
 				CFG_EVENT.Code = CFG_INVALID_EVENT_CODE;
 				CFG_EVENT.Event = _PE_INVALID_EVENT;
 				return CHANGE_ME;
@@ -156,7 +182,7 @@ NTSTATUS execute(CONST PANSI_STRING cmd) {
 			setFlag(F_EM_EVENT);
 			break;
 		case EM_CFG_INTERRUPT:
-			if ( checkFlag(F_EM_PEBS_ACTIVE) ) {
+			if (checkFlag(F_EM_PEBS_ACTIVE)) {
 				debug("[!EXC] CANNOT change Interrupt while PEBS active.");
 				return CHANGE_ME;
 			}
@@ -175,6 +201,7 @@ NTSTATUS execute(CONST PANSI_STRING cmd) {
 
 			sprintf(dbgMsg, "[EXC] EM_CFG_THRESHOLD: %u.", emCmd.Opt1);
 			debug(dbgMsg);
+			// Only 48bits setted
 			CFG_THRESHOLD = (ULLONG_MAX - emCmd.Opt1) & 0x0000FFFFFFFFFFFF;
 
 			setFlag(F_EM_THRESHOLD);
@@ -187,16 +214,18 @@ NTSTATUS execute(CONST PANSI_STRING cmd) {
 		}
 		to_buffer(I_CGF_SET);
 
-	} else if (emCmd.Type == EM_CMD_START) {
+	}
+	else if (emCmd.Type == EM_CMD_START) {
 		// ############################################################
 		// ### COMMAND START ##########################################
 		//to_buffer(I_START);
-		if ( checkFlag(F_EM_PEBS_ACTIVE) ) {
+		if (checkFlag(F_EM_PEBS_ACTIVE)) {
 			// TODO: Return better code error
+			debug("[!EXC] PEBS Already ACTIVE!");
 			return CHANGE_ME;
 		}
 
-		if (! checkFlag(F_EM_CONFIGURED) ) {
+		if (!checkFlag(F_EM_CONFIGURED)) {
 			debug("[!EXC] NOT CONFIGURED");
 			return CHANGE_ME;
 		}
@@ -210,15 +239,22 @@ NTSTATUS execute(CONST PANSI_STRING cmd) {
 			st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)0);
 
 			if (NT_SUCCESS(st)) {
+				INTERRUPTS = 0;
 				setFlag(F_EM_PEBS_ACTIVE);
+				st = PsCreateSystemThread(&thandleCollector, GENERIC_ALL, NULL, NULL, NULL, start_collector, (VOID*)1);
+				if (!NT_SUCCESS(st)) {
+					debug("[!EXC] Failed to create collector thread!");
+					unhook_handler();
+				}
 			}
+
 		}
 
 		if ((emCmd.Event & 2) == 2) {
 			// Core 1
 			debug("[EXC] Activating PEBS in core 1. (FUTURE)");
 		}
-		
+
 		if ((emCmd.Event & 4) == 4) {
 			// Core 2
 		}
@@ -226,32 +262,29 @@ NTSTATUS execute(CONST PANSI_STRING cmd) {
 		if ((emCmd.Event & 8) == 8) {
 			// Core 3
 		}
-		
-		if ( ! checkFlag(F_EM_PEBS_ACTIVE) ) {
+
+		if (!checkFlag(F_EM_PEBS_ACTIVE)) {
 			sprintf(dbgMsg, "[EXC] %d is not a valid Start Configuration.", emCmd.Event);
 			debug(dbgMsg);
-		} else {
+		}
+		else {
 			to_buffer(I_ENABLE);
 		}
-		
-	} else if (emCmd.Type == EM_CMD_STOP) {
+
+	}
+	else if (emCmd.Type == EM_CMD_STOP) {
 		// ############################################################
 		// ### COMMAND STOP ###########################################
-		if ( ! checkFlag(F_EM_PEBS_ACTIVE) ) {
+		if (!checkFlag(F_EM_PEBS_ACTIVE)) {
 			// TODO: Return better code error
 			return CHANGE_ME;
 		}
 
-		to_buffer(I_STOP);
+		//to_buffer(I_STOP);
 		switch (emCmd.Event) {
 		case EM_STCFG_CORE0:
 			debug("[EXC] Deactivating PEBS in core 0.");
-			st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StopperThread, (VOID*)0);
-
-			// uninstall hook after stop Thread
-			unhook_handler();
-			setFlag(F_EM_PEBS_ACTIVE);
-			INTERRUPTS = 0; // TODO: Make vector for multiple cores
+			stop_pebs(0);
 			break;
 		default:
 			sprintf(dbgMsg, "[EXC] %d is not a valid Stop Configuration.", emCmd.Event);
@@ -259,7 +292,8 @@ NTSTATUS execute(CONST PANSI_STRING cmd) {
 			break;
 		}
 
-	} else {
+	}
+	else {
 		// Error
 		sprintf(dbgMsg, "[EXC] %d is not a valid CMD.", emCmd.Type);
 		debug(dbgMsg);
@@ -267,33 +301,6 @@ NTSTATUS execute(CONST PANSI_STRING cmd) {
 
 	return st;
 }
-
-/*
-NTSTATUS sample(PANSI_STRING emBfr) {
-	//NTSTATUS st;
-
-	if (emBfr->Length > 0) {
-#ifdef SIMULATION
-		//sprintf(BFR,"%i", rand()); // Not necessary but illustrative
-		sprintf(emBfr->Buffer, "%d,%u.", EM_EVT_CACHE_SS, RtlRandomEx(&emsSeed) );
-		emBfr->Length = (USHORT) strlen(emBfr->Buffer);
-#else
-		// TODO: Read from SamplesBuffer
-		EM_SAMPLE sample;
-
-		sprintf(emBfr->Buffer, "%d,%d.", sample.Event, sample.Counter);
-		//strcpy(emBfr->Buffer, answer.Counter);
-
-		// TODO: Delete readed SampleBuffer 
-#endif
-	}
-	else {
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	return STATUS_SUCCESS;
-}
-*/
 
 /********************************************
 * Interrupt Routine
@@ -337,18 +344,22 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	sprintf(_msg, "[PMI]IA32_PERF_GLOBAL_ST: %lld", (DS_BASE->PEBS_BUFFER_BASE+INTERRUPTS)->IA32_PERF_GLOBAL_ST);
 	debug(_msg);
 #else //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-	char msg_bfr[BFR_SIZE];
-	sprintf(msg_bfr, "[PMI]INTERRUPT: %d\0", INTERRUPTS);
-	bfr_set(msg_bfr);
-	debug(msg_bfr);
+	//char msg_bfr[BFR_SIZE];
+	//sprintf(msg_bfr, "[PMI]INTERRUPT: %d\0", INTERRUPTS);
+	//bfr_set(msg_bfr);
+	//debug(msg_bfr);
 #endif
 
 	// Increment interrupt counter
-	INTERRUPTS += 1;	// Test (control)
-	bfr_tick();			// IO data
+	KIRQL old;
+	ExAcquireSpinLock(&LOCK_INTERRUPT, &old);
+	INTERRUPTS++;
+	KeReleaseSpinLock(&LOCK_INTERRUPT, old);
+
+	//bfr_tick();			// IO data
 
 	// Re-enable PEBS
-	if (INTERRUPTS < CFG_INTERRUPT) {
+	if (INTERRUPTS < EM_SAFE_INTERRUPT_LIMIT) {
 		//DS_BASE->PEBS_BUFFER_BASE = PEBS_BUFFER;	// Theoretically not necessary
 
 #ifdef DEBUG_DEV //--------------------------------------------------------------------
@@ -506,6 +517,8 @@ VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer) {
 }
 
 VOID StarterThread(_In_ PVOID StartContext) {
+	LARGE_INTEGER pa;
+	UINT32 *APIC;
 	uintptr_t core;
 	// Get core information (number)
 	core = (uintptr_t)StartContext;
@@ -514,14 +527,13 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	thread_attach_to_core(core);
 
 	// Allocate structs and buffers
-	//DS_BASE = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), 'DSB');
-	//PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, 5*sizeof(TPEBS_BUFFER), 'PBF');
-	DS_BASE = (PTDS_BASE)ExAllocatePool(NonPagedPool, sizeof(TDS_BASE));
-	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePool(NonPagedPool, MAX_INTERRUPTS * sizeof(TPEBS_BUFFER));
+	DS_BASE = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), 'DSB');
+	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CFG_INTERRUPT * sizeof(TPEBS_BUFFER), 'PBF');
+	//DS_BASE = (PTDS_BASE)ExAllocatePool(NonPagedPool, sizeof(TDS_BASE));
+	//PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePool(NonPagedPool, CFG_INTERRUPT * sizeof(TPEBS_BUFFER));
 
 	fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
-	LARGE_INTEGER pa;
-	UINT32 *APIC;
+	
 	pa.QuadPart = PERF_COUNTER_APIC;
 	/*
 	NTKERNELAPI PVOID MmMapIoSpace(
@@ -575,23 +587,20 @@ VOID StopperThread(_In_ PVOID StartContext) {
 	__writemsr(MSR_IA32_PEBS_ENABLE, DISABLE_PEBS);
 	__writemsr(MSR_IA32_GLOBAL_CTRL, DISABLE_PEBS);
 
-	// Unhook PMI
-	unhook_handler();
-
 	// Free allocated memory
-	//ExFreePoolWithTag(PEBS_BUFFER, 'PBF'); // Buffer
-	//ExFreePoolWithTag(DS_BASE, 'DSB');	// Struct
-	ExFreePool(PEBS_BUFFER); // Buffer
-	ExFreePool(DS_BASE);	// Struct
+	ExFreePoolWithTag(PEBS_BUFFER, 'PBF'); // Buffer
+	ExFreePoolWithTag(DS_BASE, 'DSB');	// Struct
+	//ExFreePool(PEBS_BUFFER); // Buffer
+	//ExFreePool(DS_BASE);	// Struct
 
 	debug("Thread stopped. Resources FREE");
 }
 
 BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap) {
-	TEPEBS_EVENTS all_events[] = {
+	CONST TEPEBS_EVENTS all_events[] = {
 		_PE_INVALID_EVENT,					// 0
 		//
-		_PE_MEM_INST_RET_LOADS,			// 1
+		_PE_MEM_INST_RET_LOADS,				// 1
 		_PE_MEM_INST_RET_STORES,
 		_PE_MEM_INST_RET_LAT_ABOV_THS,
 		//
@@ -607,7 +616,7 @@ BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap) {
 		_PE_MEM_UNC_EVT_RET_NON_LOCAL_DRAM,	// 12
 		_PE_MEM_UNC_EVT_RET_IO,
 		//
-		_PE_INST_RET_ALL,	// 14
+		_PE_INST_RET_ALL,			// 14
 		_PE_INST_RET_FP,
 		_PE_INST_RET_MMX,
 		//
@@ -621,7 +630,7 @@ BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap) {
 		_PE_BR_INST_RET_NEAR_CALL,		// 22
 		_PE_BR_INST_RET_ALL_BRANCHES,	// 23
 		//
-		_PE_BR_MISP_RETIRED,	// 24
+		_PE_BR_MISP_RETIRED,			// 24
 		_PE_BR_MISP_NEAR_CALL,
 		_PE_BR_MISP_ALL_BRANCHES,
 		//
@@ -631,7 +640,7 @@ BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap) {
 		_PE_SSEX_UOPS_RET_SCALAR_DOUBLE,	// 30
 		_PE_SSEX_UOPS_RET_VECTOR_INTEGER,
 		//
-		_PE_ITBL_MISS_RET_ITBL_MISS,	// 31
+		_PE_ITBL_MISS_RET_ITBL_MISS,		// 31
 		//
 		_PE_MEM_LOAD_RET_LD_HIT_L1,					// 32
 		_PE_MEM_LOAD_RET_LD_HIT_L2_MLC,
@@ -642,9 +651,9 @@ BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap) {
 		_PE_MEM_LOAD_RET_LD_HT_LFB_BUT_MS_IN_L1,	// 38
 		_PE_MEM_LOAD_RET_LD_MS_IN_LAST_LVL_DTBL,
 		//
-		_PE_BR_CND_MISPREDICT_BIMODAL,	// 40
+		_PE_BR_CND_MISPREDICT_BIMODAL,		// 40
 		//
-		_PE_FP_ASSISTS_ALL,		// 41
+		_PE_FP_ASSISTS_ALL,					// 41
 		_PE_FP_ASSISTS_OUTPUT,
 		_PE_FP_ASSISTS_INPUT
 	};

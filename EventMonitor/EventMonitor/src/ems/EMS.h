@@ -2,20 +2,21 @@
 #include "../config.h"
 #include <intrin.h>
 
+
 // --+-- DEBUG --+--
 #define IA32_PMC0 0
-#define GLOBAL_STATUS_PEBS_OVF 1ull<<62
-#define GLOBAL_STATUS_OVF_PC0 1
+#define GLOBAL_STATUS_PEBS_OVF	1ull<<62
+#define GLOBAL_STATUS_OVF_PC0	1
 // ^^^^^ DEBUG ^^^^^
 
 #define NEHALEM_NEW_FIELDS 1
-#define EMS_CMD_MAX_LENGTH 4
-#define EMS_OPT_MAX_LENGTH 28
-#define MAX_INTERRUPTS 50
+#define EMS_CMD_MAX_LENGTH 4u
+#define EMS_OPT_MAX_LENGTH 12u
+#define EMS_BUFFER_MAX_LENGHT EMS_CMD_MAX_LENGTH + 2u * (EMS_OPT_MAX_LENGTH + 1u) // CMD\ OPT1\ OPT2 4 + 2 * (12 + 1) = 4 + 26 = 30
+#define EM_SAFE_INTERRUPT_LIMIT 1ul << 12
+
 #ifdef DEBUG_DEV
-	#define _PERIOD 0xFFFFull	// Easy to verify
-#else
-	#define _PERIOD 900000ull	// Event to arm PEBS one time (unsigned long long)
+	#define _PERIOD 0xFFFFull	// Easy to verify. Not used since V0.3
 #endif
 
 /*
@@ -114,11 +115,6 @@ typedef struct st_EM_SAMPLE {
 #define DISABLE_PEBS 0
 #define ENABLE_PEBS 1
 
-// Limit
-// Only 48bits setted
-#define PERIOD (ULLONG_MAX - _PERIOD) & 0x0000FFFFFFFFFFFF
-//#define PEBS_CTR0_RST_VALUE _PERIOD 
-
 #define EVTSEL_EN 1<<22
 #define EVTSEL_USR 1<<16
 #define EVTSEL_INT 1<<20
@@ -134,11 +130,7 @@ typedef struct st_EM_SAMPLE {
 
 #define PERF_COUNTER_APIC			0xFEE00340
 
-//#define PEBS_EVENT 0x1c2
-
-#define MSR_DS_AREA 0x600// 1536
-
-
+#define MSR_DS_AREA 0x600	// 1536
 
 /* TODO: Move to separated header file */
 typedef enum EPEBS_EVENTS {
@@ -202,7 +194,7 @@ typedef enum EPEBS_EVENTS {
 	_PE_FP_ASSISTS_INPUT	= 0x04F7
 }TEPEBS_EVENTS, *PTEPEBS_EVENTS;
 
-#define _NUM_EVENTS 44
+#define _NUM_EVENTS 45
 #define CFG_INVALID_EVENT_CODE 0
 typedef struct _UPEBS_EVENT {
 	UINT32 Code;
@@ -212,11 +204,13 @@ typedef struct _UPEBS_EVENT {
 /*
 Functions
 */
-NTSTATUS _unpack(CONST PANSI_STRING cmd, PTEM_CMD emCmd);
-NTSTATUS execute(CONST PANSI_STRING cmd);
+NTSTATUS _unpack(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _Out_ PTEM_CMD emCmd, _In_ UINT16 datasize);
+NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize);
 //NTSTATUS sample(PANSI_STRING info);
 
+UINT32 get_cfg_interrupt();
 VOID initialize_em();
+VOID get_interrupts(_Out_ PUINT32 collect);
 VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext);
 VOID hook_handler();
 VOID unhook_handler();
@@ -225,3 +219,4 @@ VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer);
 VOID StarterThread(_In_ PVOID StartContext);
 VOID StopperThread(_In_ PVOID StartContext);
 BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap);
+NTSTATUS stop_pebs(_In_ INT core);

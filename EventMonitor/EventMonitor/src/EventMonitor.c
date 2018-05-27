@@ -10,6 +10,8 @@ Environment:
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 #include "dvc/device.h"
 #include "bfr/buffer.h"
+#include "ems/EMS.h"
+#include "config.h"
 
 PFLT_FILTER gFilterHandle;
 ULONG_PTR OperationStatusCtx = 1;
@@ -86,9 +88,12 @@ DriverEntry (
     //}
 
 	/* create simply buffer */
+	init_config();
 	if (bfr_create() == 0) {
 		debug("Buffer created.");
 	}
+	initialize_em();
+	
 	//debug("Entry Point: Out");
 
     return status;

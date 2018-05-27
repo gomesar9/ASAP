@@ -25,6 +25,7 @@
 #define F_EM_CONFIGURED (F_EM_INTERRUPT | F_EM_EVENT | F_EM_THRESHOLD)
 
 UINT32 FLAGS;
+VOID init_config();
 VOID setFlag(UINT32 flag);
 BOOLEAN checkFlag(UINT32 flag);
 VOID clearFlag(UINT32 flag);
