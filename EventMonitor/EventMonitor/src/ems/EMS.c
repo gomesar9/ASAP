@@ -16,6 +16,7 @@ UINT32 INTERRUPTS = 0;		// Interruptions count
 UINT32 CFG_INTERRUPT;		// Max interrupts
 TPEBS_EVT_MAP CFG_EVENT;	// PEBS Event Code
 UINT32 CFG_THRESHOLD;		// Events to trigger one interruption
+LARGE_INTEGER CFG_COLLECT_MILLI;	// Collector sleep time
 HANDLE thandle;				// Thread Handle to PEBS
 HANDLE thandleCollector;	// Thread handle to Collector
 PTDS_BASE DS_BASE;			// PEBS Base
@@ -27,21 +28,31 @@ UINT32 get_cfg_interrupt() {
 	return CFG_INTERRUPT;
 }
 
+LARGE_INTEGER get_cfg_collector_millis() {
+	return CFG_COLLECT_MILLI;
+}
+
 VOID initialize_em() {
 	CFG_EVENT.Code = CFG_INVALID_EVENT_CODE;
 	CFG_EVENT.Event = _PE_INVALID_EVENT;
 	CFG_THRESHOLD = 0;
 	CFG_INTERRUPT = 0;
+	CFG_COLLECT_MILLI.QuadPart = 10;
 	INTERRUPTS = 0;
 	KeInitializeSpinLock(&LOCK_INTERRUPT);
 }
 
-VOID get_interrupts(_Out_ PUINT32 collect) {
-	KIRQL old;
-	ExAcquireSpinLock(&LOCK_INTERRUPT, &old);
-	*collect = INTERRUPTS;
-	INTERRUPTS = 0;
-	KeReleaseSpinLock(&LOCK_INTERRUPT, old);
+BOOLEAN get_interrupts(_Out_ PUINT32 collect) {
+	if (checkFlag(F_EM_PEBS_ACTIVE)) {
+		KIRQL old;
+		ExAcquireSpinLock(&LOCK_INTERRUPT, &old);
+		*collect = INTERRUPTS;
+		INTERRUPTS = 0;
+		KeReleaseSpinLock(&LOCK_INTERRUPT, old);
+		return TRUE;
+	} else {
+		return FALSE;
+	}
 }
 
 typedef enum _INFOS{
@@ -162,16 +173,15 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 #ifdef DEBUG_DEV //--------------------------------------------------------------------
 		debug("[EXC] EM_CFG detected.");
 #endif //------------------------------------------------------------------------------
-
+		if (checkFlag(F_EM_PEBS_ACTIVE)) {
+			debug("[!EXC] CANNOT change Event while PEBS active.");
+			return CHANGE_ME;
+		}
 		switch (emCmd.Event) {
 		case EM_CFG_EVT:
-			if (checkFlag(F_EM_PEBS_ACTIVE)) {
-				debug("[!EXC] CANNOT change Event while PEBS active.");
-				return CHANGE_ME;
-			}
-
 			sprintf(dbgMsg, "[EXC] EM_CFG_EVT: %u.", emCmd.Opt1);
 			debug(dbgMsg);
+
 			CFG_EVENT.Code = emCmd.Opt1;
 			if (!getPEBSEvt(&CFG_EVENT)) {
 				CFG_EVENT.Code = CFG_INVALID_EVENT_CODE;
@@ -182,29 +192,29 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 			setFlag(F_EM_EVENT);
 			break;
 		case EM_CFG_INTERRUPT:
-			if (checkFlag(F_EM_PEBS_ACTIVE)) {
-				debug("[!EXC] CANNOT change Interrupt while PEBS active.");
-				return CHANGE_ME;
-			}
-
 			sprintf(dbgMsg, "[EXC] EM_CFG_INTERRUPT: %u.", emCmd.Opt1);
 			debug(dbgMsg);
+
 			CFG_INTERRUPT = emCmd.Opt1;
 
 			setFlag(F_EM_INTERRUPT);
 			break;
 		case EM_CFG_THRESHOLD:
-			if (checkFlag(F_EM_PEBS_ACTIVE)) {
-				debug("[!EXC] CANNOT change Threshold while PEBS active.");
-				return CHANGE_ME;
-			}
-
 			sprintf(dbgMsg, "[EXC] EM_CFG_THRESHOLD: %u.", emCmd.Opt1);
 			debug(dbgMsg);
+
 			// Only 48bits setted
 			CFG_THRESHOLD = (ULLONG_MAX - emCmd.Opt1) & 0x0000FFFFFFFFFFFF;
 
 			setFlag(F_EM_THRESHOLD);
+			break;
+		case EM_CFG_COLLECT_MILLI:
+			sprintf(dbgMsg, "[EXC] EM_CFG_COLLECT_MILLI: %u.", emCmd.Opt1);
+			debug(dbgMsg);
+
+			CFG_COLLECT_MILLI.QuadPart = emCmd.Opt1;
+
+			setFlag(F_EM_COLLECT_MILLI);
 			break;
 		default:
 			sprintf(dbgMsg, "[EXC] %d is not a valid SUBTYPE.", emCmd.Event);

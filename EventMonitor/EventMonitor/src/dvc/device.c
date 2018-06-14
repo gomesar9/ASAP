@@ -2,6 +2,13 @@
 #include "../io/IO.h"
 
 /* 
+- V.0.31, 14/05/2018:
+  - Supports dynamic configuration of:
+    - Collector sleep interval (milliseconds)
+  - Lock to buffer containers added
+  - Refactor:
+	- Interruptions now means sampling count
+
 - V.0.3, 25/05/2018:
   - Supports dynamic configuration of:
     - Threshold
@@ -20,7 +27,7 @@ NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject)
 	NTSTATUS status;
 	PDEVICE_OBJECT dev;
 	UNICODE_STRING namestring, linkstring;
-	debug("Creating Device V.0.3");
+	debug("Creating Device V.0.31");
 
 	RtlInitUnicodeString(&namestring, DRIVERNAME);
 	status = IoCreateDevice(DriverObject, 0, &namestring, FILE_DEVICE_DISK_FILE_SYSTEM, FILE_DEVICE_SECURE_OPEN, FALSE, &dev);

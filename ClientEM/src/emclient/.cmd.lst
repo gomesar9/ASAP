@@ -1,0 +1,8 @@
+enable_core1=0001
+disable_core1=0201
+set_evt=0100
+set_itr=0101
+set_thr=0102
+set_cml=0103
+evt_branch_all=23
+evt_retired_all=13

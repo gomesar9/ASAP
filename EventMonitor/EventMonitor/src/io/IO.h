@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
 /* I/O routines */
 NTSTATUS NotSupported(PDEVICE_OBJECT DeviceObject, PIRP Irp);
 NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp);
