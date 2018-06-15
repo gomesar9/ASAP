@@ -49,9 +49,9 @@ DriverEntry (
     NTSTATUS status = STATUS_SUCCESS;
 
     UNREFERENCED_PARAMETER( RegistryPath );
-#ifdef DEBUG_DEV //--------------------------------------------------------------------
+#if EVENTMONITOR_DEBUG > 0 //----------------------------------------------------------
 	debug("DriverEntry: Entered");
-#endif //------------------------------------------------------------------------------
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 	DriverObject->DriverUnload = EventMonitorUnload;
 
@@ -117,7 +117,9 @@ EventMonitorUnload (
 	IoDeleteSymbolicLink(&path);
 	IoDeleteDevice(DriverObject->DeviceObject);
 
+#if EVENTMONITOR_DEBUG >=0  //---------------------------------------------------------
 	debug("Destroying BFR");
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	bfr_destroy();
     //FltUnregisterFilter( gFilterHandle );
 

@@ -4,6 +4,14 @@
 #define PTDBG_TRACE_ROUTINES            0x00000001
 #define PTDBG_TRACE_OPERATION_STATUS    0x00000002
 
+#define BUFFER_DEBUG 0
+#define COLLECTOR_DEBUG 0
+#define CONFIG_DEBUG 0
+#define DEVICE_DEBUG 0
+#define EMS_DEBUG 0
+#define EVENTMONITOR_DEBUG 0
+#define IO_DEBUG 0
+
 /*
 	PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
 	("EventMonitor!DriverEntry: Entered\n") );

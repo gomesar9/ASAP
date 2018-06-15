@@ -89,7 +89,7 @@ typedef enum _START_CFG {
 // Enum (options) for EM_CMD_SET
 typedef enum _EM_SUBTYPE {
 	EM_CFG_EVT,				// 00
-	EM_CFG_INTERRUPT,		// 01
+	EM_CFG_COLLECT_MAX,		// 01
 	EM_CFG_THRESHOLD,		// 02
 	EM_CFG_COLLECT_MILLI,	// 03
 	EM_EVT_NULL				// 04
@@ -209,7 +209,7 @@ NTSTATUS _unpack(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _Out_ PTEM_CMD emCmd, _In
 NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize);
 //NTSTATUS sample(PANSI_STRING info);
 
-UINT32 get_cfg_interrupt();
+UINT32 get_cfg_collect_max();
 LARGE_INTEGER get_cfg_collector_millis();
 VOID initialize_em();
 BOOLEAN get_interrupts(_Out_ PUINT32 collect);

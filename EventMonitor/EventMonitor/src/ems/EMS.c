@@ -13,7 +13,7 @@
  Variables
  */
 UINT32 INTERRUPTS = 0;		// Interruptions count
-UINT32 CFG_INTERRUPT;		// Max interrupts
+UINT32 CFG_COLLECT_MAX;		// Collection times
 TPEBS_EVT_MAP CFG_EVENT;	// PEBS Event Code
 UINT32 CFG_THRESHOLD;		// Events to trigger one interruption
 LARGE_INTEGER CFG_COLLECT_MILLI;	// Collector sleep time
@@ -24,23 +24,26 @@ PTPEBS_BUFFER PEBS_BUFFER;	// PEBS Buffer
 KSPIN_LOCK LOCK_INTERRUPT;	// Spin Lock for INTERRUPTS
 
 
-UINT32 get_cfg_interrupt() {
-	return CFG_INTERRUPT;
+UINT32 get_cfg_collect_max() {
+	return CFG_COLLECT_MAX;
 }
+
 
 LARGE_INTEGER get_cfg_collector_millis() {
 	return CFG_COLLECT_MILLI;
 }
 
+
 VOID initialize_em() {
 	CFG_EVENT.Code = CFG_INVALID_EVENT_CODE;
 	CFG_EVENT.Event = _PE_INVALID_EVENT;
 	CFG_THRESHOLD = 0;
-	CFG_INTERRUPT = 0;
+	CFG_COLLECT_MAX = 0;
 	CFG_COLLECT_MILLI.QuadPart = 10;
 	INTERRUPTS = 0;
 	KeInitializeSpinLock(&LOCK_INTERRUPT);
 }
+
 
 BOOLEAN get_interrupts(_Out_ PUINT32 collect) {
 	if (checkFlag(F_EM_PEBS_ACTIVE)) {
@@ -54,6 +57,7 @@ BOOLEAN get_interrupts(_Out_ PUINT32 collect) {
 		return FALSE;
 	}
 }
+
 
 typedef enum _INFOS{
 	I_START,
@@ -85,6 +89,7 @@ void to_buffer(int info){
 	bfr_set(msg_bfr);
 }
 
+
 NTSTATUS stop_pebs(_In_ INT core) {
 	NTSTATUS st;
 	st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StopperThread, (VOID*)core);
@@ -101,11 +106,9 @@ NTSTATUS stop_pebs(_In_ INT core) {
 
 NTSTATUS _unpack(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _Out_ PTEM_CMD emCmd, _In_ UINT16 datasize) {
 	NTSTATUS st = STATUS_SUCCESS;
+	CHAR chunk[2];
+	INT num, state = 0;
 
-	char chunk[2];
-	int num, state = 0;
-
-	//while ((state * 2) + 1 < cmd->Length) {
 	while ((state * 2) + 1 < EMS_CMD_MAX_LENGTH) {
 		strncpy(chunk, &(cmd[state * 2]), 2);
 		num = atoi(chunk);
@@ -139,28 +142,25 @@ NTSTATUS _unpack(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _Out_ PTEM_CMD emCmd, _In
 #ifdef DEBUG_DEV //--------------------------------------------------------------------
 			sprintf(_bff, "[UPK]: %d.", emCmd->Opt1);
 			debug(_bff);
-#endif //------------------------------------------------------------------------------
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 		}
 		else {
 			emCmd->Type = EM_CMD_NULL;
 			emCmd->Event = EM_EVT_NULL;
+
 			// TODO: Return better code error
 			return STATUS_MESSAGE_NOT_FOUND;
 		}
 	}
 
-	/*
-	emCmd->Type = EM_CMD_SET;
-	emCmd->Event = EM_EVT_CACHE_SS;
-	*/
-
 	return st;
 }
+
 
 NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 	NTSTATUS st = STATUS_SUCCESS, CHANGE_ME = STATUS_FAIL_CHECK;
 	TEM_CMD emCmd;
-	char dbgMsg[64];
+	CHAR dbgMsg[64];
 
 	st = _unpack(cmd, &emCmd, datasize);
 	if (!NT_SUCCESS(st)) {
@@ -170,17 +170,19 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 	if (emCmd.Type == EM_CMD_CFG) {
 		// ############################################################
 		// ### COMMAND CHANGE #########################################
-#ifdef DEBUG_DEV //--------------------------------------------------------------------
+#if EMS_DEBUG > 0 //-------------------------------------------------------------------
 		debug("[EXC] EM_CFG detected.");
-#endif //------------------------------------------------------------------------------
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 		if (checkFlag(F_EM_PEBS_ACTIVE)) {
 			debug("[!EXC] CANNOT change Event while PEBS active.");
 			return CHANGE_ME;
 		}
 		switch (emCmd.Event) {
 		case EM_CFG_EVT:
+#if EMS_DEBUG > 0 //-------------------------------------------------------------------
 			sprintf(dbgMsg, "[EXC] EM_CFG_EVT: %u.", emCmd.Opt1);
 			debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 			CFG_EVENT.Code = emCmd.Opt1;
 			if (!getPEBSEvt(&CFG_EVENT)) {
@@ -191,17 +193,21 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 
 			setFlag(F_EM_EVENT);
 			break;
-		case EM_CFG_INTERRUPT:
-			sprintf(dbgMsg, "[EXC] EM_CFG_INTERRUPT: %u.", emCmd.Opt1);
+		case EM_CFG_COLLECT_MAX:
+#if EMS_DEBUG > 0 //-------------------------------------------------------------------
+			sprintf(dbgMsg, "[EXC] EM_CFG_COLLECT_MAX: %u.", emCmd.Opt1);
 			debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-			CFG_INTERRUPT = emCmd.Opt1;
+			CFG_COLLECT_MAX = emCmd.Opt1;
 
-			setFlag(F_EM_INTERRUPT);
+			setFlag(F_EM_COLLECT_MAX);
 			break;
 		case EM_CFG_THRESHOLD:
+#if EMS_DEBUG > 0 //-------------------------------------------------------------------
 			sprintf(dbgMsg, "[EXC] EM_CFG_THRESHOLD: %u.", emCmd.Opt1);
 			debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 			// Only 48bits setted
 			CFG_THRESHOLD = (ULLONG_MAX - emCmd.Opt1) & 0x0000FFFFFFFFFFFF;
@@ -209,8 +215,10 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 			setFlag(F_EM_THRESHOLD);
 			break;
 		case EM_CFG_COLLECT_MILLI:
+#if EMS_DEBUG > 0 //-------------------------------------------------------------------
 			sprintf(dbgMsg, "[EXC] EM_CFG_COLLECT_MILLI: %u.", emCmd.Opt1);
 			debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 			CFG_COLLECT_MILLI.QuadPart = emCmd.Opt1;
 
@@ -245,7 +253,9 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 		// TODO: Apply mask to enable multiple cores
 		if ((emCmd.Event & 1) == 1) {
 			// Core 0
-			debug("[EXC] Activating PEBS in core 0.");
+#if EMS_DEBUG > 0 //-------------------------------------------------------------------
+			debug("[EXC] Activating PEBS in core 1.");
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 			st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)0);
 
 			if (NT_SUCCESS(st)) {
@@ -262,15 +272,23 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 
 		if ((emCmd.Event & 2) == 2) {
 			// Core 1
-			debug("[EXC] Activating PEBS in core 1. (FUTURE)");
+#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
+			debug("[EXC] Activating PEBS in core 2.");
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 		}
 
 		if ((emCmd.Event & 4) == 4) {
 			// Core 2
+#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
+			debug("[EXC] Activating PEBS in core 3.");
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 		}
 
 		if ((emCmd.Event & 8) == 8) {
 			// Core 3
+#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
+			debug("[EXC] Activating PEBS in core 4.");
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 		}
 
 		if (!checkFlag(F_EM_PEBS_ACTIVE)) {
@@ -318,7 +336,6 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	UNREFERENCED_PARAMETER(Interrupt);
 	UNREFERENCED_PARAMETER(ServiceContext);
-	//debug("Interrupt routine reached");
 
 	LARGE_INTEGER pa;
 	UINT32* APIC;
@@ -538,9 +555,8 @@ VOID StarterThread(_In_ PVOID StartContext) {
 
 	// Allocate structs and buffers
 	DS_BASE = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), 'DSB');
-	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CFG_INTERRUPT * sizeof(TPEBS_BUFFER), 'PBF');
-	//DS_BASE = (PTDS_BASE)ExAllocatePool(NonPagedPool, sizeof(TDS_BASE));
-	//PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePool(NonPagedPool, CFG_INTERRUPT * sizeof(TPEBS_BUFFER));
+	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CFG_COLLECT_MAX * sizeof(TPEBS_BUFFER), 'PBF');
+
 
 	fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
 	
@@ -564,31 +580,33 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	
 	// Set threshold (counter) and events
 	__writemsr(MSR_IA32_PERFCTR0, CFG_THRESHOLD);
+
+#ifdef DEBUG_DEV
 	// IA32_PMC0 = 0
-	char _msg[64];
+	CHAR _msg[64];
 	UINT64 pmc0 = __readpmc(0);
 	sprintf(_msg, "PMC0: %llx", pmc0);
 	debug(_msg);
 	pmc0 = __readmsr(MSR_IA32_PERFCTR0);
 	sprintf(_msg, "MSR_IA32_PERFCTR0: %llx", pmc0);
 	debug(_msg);
+#endif
 	//__writemsr(MSR_IA32_EVNTSEL0, PEBS_EVENT | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
 	__writemsr(MSR_IA32_EVNTSEL0, CFG_EVENT.Event | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
 
 	// Enable PEBS
 	__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
 	__writemsr(MSR_IA32_GLOBAL_CTRL, ENABLE_PEBS);
-	
+#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
 	debug("PEBS setado");
+#endif //------------------------------------------------------------------------------
+
 }
 
 VOID StopperThread(_In_ PVOID StartContext) {
 	//int core;
 	uintptr_t core;
 	core = (uintptr_t)StartContext;
-#ifdef DEBUG_DEV //--------------------------------------------------------------------
-	debug("Stopping thread");
-#endif //------------------------------------------------------------------------------
 	
 	// Attach to a given core
 	thread_attach_to_core(core);
@@ -600,10 +618,10 @@ VOID StopperThread(_In_ PVOID StartContext) {
 	// Free allocated memory
 	ExFreePoolWithTag(PEBS_BUFFER, 'PBF'); // Buffer
 	ExFreePoolWithTag(DS_BASE, 'DSB');	// Struct
-	//ExFreePool(PEBS_BUFFER); // Buffer
-	//ExFreePool(DS_BASE);	// Struct
 
+#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
 	debug("Thread stopped. Resources FREE");
+#endif //------------------------------------------------------------------------------
 }
 
 BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap) {

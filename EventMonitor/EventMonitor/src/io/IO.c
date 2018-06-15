@@ -14,7 +14,6 @@
 NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
 	UNREFERENCED_PARAMETER(DeviceObject);
-	//debug("IO::Write : Entered");
 	//TBTS_BUFFER bdata;
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
@@ -58,7 +57,6 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 /* Write data from driver to the userland stack */
 NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 	UNREFERENCED_PARAMETER(DeviceObject);
-	//debug("IO::Read : Entered");
 	//TBTS_BUFFER bdata;
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
