@@ -70,15 +70,20 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\bfr\buffer.h" />
+    <ClInclude Include="src\clt\collector.h" />
     <ClInclude Include="src\config.h" />
     <ClInclude Include="src\dbg\debug.h" />
     <ClInclude Include="src\dvc\device.h" />
+    <ClInclude Include="src\ems\EMS.h" />
     <ClInclude Include="src\io\IO.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\bfr\buffer.c" />
+    <ClCompile Include="src\cfg\config.c" />
+    <ClCompile Include="src\clt\collector.c" />
     <ClCompile Include="src\dbg\debug.c" />
     <ClCompile Include="src\dvc\device.c" />
+    <ClCompile Include="src\ems\EMS.c" />
     <ClCompile Include="src\EventMonitor.c" />
     <ClCompile Include="src\io\IO.c" />
   </ItemGroup>
