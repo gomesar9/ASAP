@@ -247,6 +247,8 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 			debug("[!EXC] NOT CONFIGURED");
 			return CHANGE_ME;
 		}
+		UINT32 core;
+		
 		// Install hook before start Thread
 		hook_handler();
 
@@ -254,14 +256,16 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 		if ((emCmd.Event & 1) == 1) {
 			// Core 0
 #if EMS_DEBUG > 0 //-------------------------------------------------------------------
-			debug("[EXC] Activating PEBS in core 1.");
+			debug("[EXC] Activating PEBS in 1th core.");
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)0);
+			core = 0;
+
+			st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)core);
 
 			if (NT_SUCCESS(st)) {
 				INTERRUPTS = 0;
 				setFlag(F_EM_PEBS_ACTIVE);
-				st = PsCreateSystemThread(&thandleCollector, GENERIC_ALL, NULL, NULL, NULL, start_collector, (VOID*)1);
+				st = PsCreateSystemThread(&thandleCollector, GENERIC_ALL, NULL, NULL, NULL, start_collector, &core);
 				if (!NT_SUCCESS(st)) {
 					debug("[!EXC] Failed to create collector thread!");
 					unhook_handler();
@@ -273,22 +277,25 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 		if ((emCmd.Event & 2) == 2) {
 			// Core 1
 #if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-			debug("[EXC] Activating PEBS in core 2.");
+			debug("[EXC] Activating PEBS in 2th core.");
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+			core = 1;
 		}
 
 		if ((emCmd.Event & 4) == 4) {
 			// Core 2
 #if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-			debug("[EXC] Activating PEBS in core 3.");
+			debug("[EXC] Activating PEBS in 3th core.");
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+			core = 2;
 		}
 
 		if ((emCmd.Event & 8) == 8) {
 			// Core 3
 #if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-			debug("[EXC] Activating PEBS in core 4.");
+			debug("[EXC] Activating PEBS in 4th core.");
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+			core = 3;
 		}
 
 		if (!checkFlag(F_EM_PEBS_ACTIVE)) {

@@ -8,18 +8,20 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 	/*
 	Purpose: Collect interruptions count and put data into buffer
 	*/
-	UNREFERENCED_PARAMETER(StartContext);
 	LARGE_INTEGER _interval;
 	UINT32 counter = 0,
 		//accumulator = 0, 
 		_collect_count = 0;
 	UINT32 _cfg_collect_max;
 	UINT32 DATA[SAMPLE_MAX];
+	UINT32 core;
 
-	//uintptr_t core;
 	// Get core information (number)
-	//core = (uintptr_t)StartContext;
-
+	core = *((UINT32*)StartContext);
+	CHAR _msg[128];
+	sprintf(_msg, "[CLT] Core: %u.", core);
+	debug(_msg);
+	core = 0;
 	_interval.QuadPart = get_cfg_collector_millis().QuadPart * NEG_MILLI;
 	_cfg_collect_max = get_cfg_collect_max();
 
@@ -49,8 +51,7 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 			sprintf( _msg, "[CLT] %u, %u, %u, ...", DATA[0], DATA[1], DATA[2] );
 			debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			UINT32 CORE_TMP = 0;
-			bfr_tick(DATA, counter, CORE_TMP);
+			bfr_tick(DATA, counter, core);
 			counter = 0;
 		}
 
@@ -69,8 +70,7 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 		sprintf(_msg, "[CLT](L) %u, %u, %u, ...", DATA[0], DATA[1], DATA[2]);
 		debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-		UINT32 CORE_TMP = 0;
-		bfr_tick(DATA, counter, CORE_TMP);
+		bfr_tick(DATA, counter, core);
 		counter = 0;
 	}
 	//sprintf(_msg, "[CLT](F) Accumulator: %u.", accumulator);
