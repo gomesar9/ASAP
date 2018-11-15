@@ -20,7 +20,7 @@ int bfr_create() {
 	BFR = ExAllocatePoolWithTag(NonPagedPoolNx, BFR_BYTE_SIZE, 'RFB');
 	memset(BFR, '\0', BFR_BYTE_SIZE);
 
-	for (size_t i = 0; i < 4; i++)
+	for (size_t i = 0; i < CORE_QTD; i++)
 	{
 		TAIL[i] = 0;
 		HEAD[i] = 0;

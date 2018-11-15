@@ -77,7 +77,7 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 
 	// --+-- BAND-AID --+--
 	UINT32 CORE_TMP = 0;
-	return_code = get_samples(samples, CORE_TMP);
+	return_code = get_samples(samples, CORE_TMP);  // TODO: Get ANY or ALL core samples. Removing param
 	if (return_code != 0) {
 //		sprintf(buff, "%llu", samples);
 //	} else {

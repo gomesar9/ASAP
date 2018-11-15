@@ -33,7 +33,7 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 	//while (accumulator < _cfg_interrupt) {
 	while (_collect_count < _cfg_collect_max) {
 		// Collect data
-		if (get_interrupts(&DATA[counter]) == FALSE) {
+		if (get_interrupts(&DATA[counter], core) == FALSE) {
 			debug("[CLT] Stopped from command.");
 			return STATUS_SUCCESS;
 		}

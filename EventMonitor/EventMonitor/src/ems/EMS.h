@@ -212,7 +212,7 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize);
 UINT32 get_cfg_collect_max();
 LARGE_INTEGER get_cfg_collector_millis();
 VOID initialize_em();
-BOOLEAN get_interrupts(_Out_ PUINT32 collect);
+BOOLEAN get_interrupts(_Out_ PUINT32 collect, UINT32 core);
 VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext);
 VOID hook_handler();
 VOID unhook_handler();

@@ -319,7 +319,7 @@ class EMShell():
         if not self.__em_started:
             self.__start()
     
-        time.sleep(5)
+        time.sleep(3)
         self.__print("Connecting client.")
         self.cl.connect()
         self.__cl_connected = True

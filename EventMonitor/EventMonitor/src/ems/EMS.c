@@ -12,16 +12,16 @@
  /*
  Variables
  */
-UINT32 INTERRUPTS = 0;		// Interruptions count
-UINT32 CFG_COLLECT_MAX;		// Collection times
-TPEBS_EVT_MAP CFG_EVENT;	// PEBS Event Code
-UINT32 CFG_THRESHOLD;		// Events to trigger one interruption
-LARGE_INTEGER CFG_COLLECT_MILLI;	// Collector sleep time
-HANDLE thandle;				// Thread Handle to PEBS
-HANDLE thandleCollector;	// Thread handle to Collector
-PTDS_BASE DS_BASE;			// PEBS Base
-PTPEBS_BUFFER PEBS_BUFFER;	// PEBS Buffer
-KSPIN_LOCK LOCK_INTERRUPT;	// Spin Lock for INTERRUPTS
+UINT32 INTERRUPTS[CORE_QTD];			// Interruptions count
+UINT32 CFG_COLLECT_MAX;					// Collection times
+TPEBS_EVT_MAP CFG_EVENT;				// PEBS Event Code
+UINT32 CFG_THRESHOLD;					// Events to trigger one interruption
+LARGE_INTEGER CFG_COLLECT_MILLI;		// Collector sleep time
+HANDLE thandle[CORE_QTD];				// Thread Handle to PEBS
+HANDLE thandleCollector[CORE_QTD];		// Thread handle to Collector
+PTDS_BASE DS_BASE;						// PEBS Base
+PTPEBS_BUFFER PEBS_BUFFER;				// PEBS Buffer
+KSPIN_LOCK LOCK_INTERRUPT[CORE_QTD];	// Spin Lock for INTERRUPTS
 
 
 UINT32 get_cfg_collect_max() {
@@ -40,18 +40,20 @@ VOID initialize_em() {
 	CFG_THRESHOLD = 0;
 	CFG_COLLECT_MAX = 0;
 	CFG_COLLECT_MILLI.QuadPart = 10;
-	INTERRUPTS = 0;
-	KeInitializeSpinLock(&LOCK_INTERRUPT);
+	for (size_t i = 0; i < CORE_QTD; i++) {
+		INTERRUPTS[i] = 0;
+		KeInitializeSpinLock(&LOCK_INTERRUPT[i]);
+	}
 }
 
 
-BOOLEAN get_interrupts(_Out_ PUINT32 collect) {
+BOOLEAN get_interrupts(_Out_ PUINT32 collect, UINT32 core) {
 	if (checkFlag(F_EM_PEBS_ACTIVE)) {
 		KIRQL old;
-		ExAcquireSpinLock(&LOCK_INTERRUPT, &old);
-		*collect = INTERRUPTS;
-		INTERRUPTS = 0;
-		KeReleaseSpinLock(&LOCK_INTERRUPT, old);
+		ExAcquireSpinLock(&LOCK_INTERRUPT[core], &old);
+		*collect = INTERRUPTS[core];
+		INTERRUPTS[core] = 0;
+		KeReleaseSpinLock(&LOCK_INTERRUPT[core], old);
 		return TRUE;
 	} else {
 		return FALSE;
@@ -92,7 +94,7 @@ void to_buffer(int info){
 
 NTSTATUS stop_pebs(_In_ INT core) {
 	NTSTATUS st;
-	st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StopperThread, (VOID*)core);
+	st = PsCreateSystemThread(&thandle[core], GENERIC_ALL, NULL, NULL, NULL, StopperThread, (VOID*)core);
 
 	clearFlag(F_EM_PEBS_ACTIVE);
 
@@ -260,12 +262,12 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 			core = 0;
 
-			st = PsCreateSystemThread(&thandle, GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)core);
+			st = PsCreateSystemThread(&thandle[core], GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)core);
 
 			if (NT_SUCCESS(st)) {
-				INTERRUPTS = 0;
+				INTERRUPTS[0] = 0;
 				setFlag(F_EM_PEBS_ACTIVE);
-				st = PsCreateSystemThread(&thandleCollector, GENERIC_ALL, NULL, NULL, NULL, start_collector, &core);
+				st = PsCreateSystemThread(&thandleCollector[core], GENERIC_ALL, NULL, NULL, NULL, start_collector, &core);
 				if (!NT_SUCCESS(st)) {
 					debug("[!EXC] Failed to create collector thread!");
 					unhook_handler();
@@ -386,14 +388,14 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 
 	// Increment interrupt counter
 	KIRQL old;
-	ExAcquireSpinLock(&LOCK_INTERRUPT, &old);
-	INTERRUPTS++;
-	KeReleaseSpinLock(&LOCK_INTERRUPT, old);
+	ExAcquireSpinLock(&LOCK_INTERRUPT[0], &old);
+	INTERRUPTS[0]++;
+	KeReleaseSpinLock(&LOCK_INTERRUPT[0], old);
 
 	//bfr_tick();			// IO data
 
 	// Re-enable PEBS
-	if (INTERRUPTS < EM_SAFE_INTERRUPT_LIMIT) {
+	if (INTERRUPTS[0] < EM_SAFE_INTERRUPT_LIMIT) {
 		//DS_BASE->PEBS_BUFFER_BASE = PEBS_BUFFER;	// Theoretically not necessary
 
 #ifdef DEBUG_DEV //--------------------------------------------------------------------
