@@ -49,7 +49,8 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 			sprintf( _msg, "[CLT] %u, %u, %u, ...", DATA[0], DATA[1], DATA[2] );
 			debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			bfr_tick(DATA, counter);
+			UINT32 CORE_TMP = 0;
+			bfr_tick(DATA, counter, CORE_TMP);
 			counter = 0;
 		}
 
@@ -68,7 +69,8 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 		sprintf(_msg, "[CLT](L) %u, %u, %u, ...", DATA[0], DATA[1], DATA[2]);
 		debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-		bfr_tick(DATA, counter);
+		UINT32 CORE_TMP = 0;
+		bfr_tick(DATA, counter, CORE_TMP);
 		counter = 0;
 	}
 	//sprintf(_msg, "[CLT](F) Accumulator: %u.", accumulator);
