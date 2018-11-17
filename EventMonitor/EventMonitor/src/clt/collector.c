@@ -24,7 +24,7 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 
 #if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
 	CHAR _msg[128];
-	sprintf(_msg, "[CLT] Core: %u. ITR: %u.", core, _cfg_interrupt);
+	sprintf(_msg, "[CLT] Core: %u. ITR: %u.", core, _cfg_collect_max);
 	debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	//while (accumulator < _cfg_interrupt) {

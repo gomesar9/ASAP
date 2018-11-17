@@ -365,8 +365,8 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	UNREFERENCED_PARAMETER(ServiceContext);
 	ULONG core;
 	/* identify current core */
-	//core = KeGetCurrentProcessorNumber();
-	core = 0;  // TODO: Change to dynamic
+	core = KeGetCurrentProcessorNumber();
+	//core = 0;  // TODO: Change to dynamic
 
 	LARGE_INTEGER pa;
 	UINT32* APIC;

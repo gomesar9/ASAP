@@ -22,6 +22,6 @@ int TAIL[CORE_QTD], HEAD[CORE_QTD];
 ST_SAMPLES SAMPLES0[CORE_QTD], SAMPLES1[CORE_QTD], SAMPLES2[CORE_QTD];
 
 VOID bfr_tick(UINT32 samples[SAMPLE_MAX], _In_ UINT32 ticks, UINT32 core);
-INT get_samples(_Out_ CHAR samples[IO_MAX_OUT_BUFFER], UINT32 core);
+INT get_samples(_Out_ CHAR samples[IO_MAX_OUT_BUFFER]);
 #endif
 
