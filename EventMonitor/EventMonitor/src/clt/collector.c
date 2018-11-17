@@ -8,30 +8,29 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 	/*
 	Purpose: Collect interruptions count and put data into buffer
 	*/
-	UNREFERENCED_PARAMETER(StartContext);
 	LARGE_INTEGER _interval;
 	UINT32 counter = 0,
 		//accumulator = 0, 
 		_collect_count = 0;
 	UINT32 _cfg_collect_max;
 	UINT32 DATA[SAMPLE_MAX];
+	UINT32 core;
 
-	//uintptr_t core;
 	// Get core information (number)
-	//core = (uintptr_t)StartContext;
+	core = *((UINT32*)StartContext);
 
 	_interval.QuadPart = get_cfg_collector_millis().QuadPart * NEG_MILLI;
 	_cfg_collect_max = get_cfg_collect_max();
 
 #if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
 	CHAR _msg[128];
-	sprintf(_msg, "[CLT](I) ITR: %u.", _cfg_interrupt);
+	sprintf(_msg, "[CLT] Core: %u. ITR: %u.", core, _cfg_interrupt);
 	debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	//while (accumulator < _cfg_interrupt) {
 	while (_collect_count < _cfg_collect_max) {
 		// Collect data
-		if (get_interrupts(&DATA[counter]) == FALSE) {
+		if (get_interrupts(&DATA[counter], core) == FALSE) {
 			debug("[CLT] Stopped from command.");
 			return STATUS_SUCCESS;
 		}
@@ -49,7 +48,7 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 			sprintf( _msg, "[CLT] %u, %u, %u, ...", DATA[0], DATA[1], DATA[2] );
 			debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			bfr_tick(DATA, counter);
+			bfr_tick(DATA, counter, core);
 			counter = 0;
 		}
 
@@ -68,7 +67,7 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 		sprintf(_msg, "[CLT](L) %u, %u, %u, ...", DATA[0], DATA[1], DATA[2]);
 		debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-		bfr_tick(DATA, counter);
+		bfr_tick(DATA, counter, core);
 		counter = 0;
 	}
 	//sprintf(_msg, "[CLT](F) Accumulator: %u.", accumulator);

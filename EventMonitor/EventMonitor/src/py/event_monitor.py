@@ -264,7 +264,8 @@ class EMShell():
                 "write": self.__i_write,
                 "?": self.__help,
                 "h": self.__help,
-                "help": self.__help
+                "help": self.__help,
+                "dummy": self.dummy_setup,
                 }
         self.__cl_connected = False
         self.__em_started = False
@@ -318,7 +319,7 @@ class EMShell():
         if not self.__em_started:
             self.__start()
     
-        time.sleep(5)
+        time.sleep(3)
         self.__print("Connecting client.")
         self.cl.connect()
         self.__cl_connected = True
@@ -339,10 +340,11 @@ class EMShell():
             "evt": ["Set Event. Requires Int. Ex: 'evt 23'.", "0100"],
             "itr": ["Set Interruption. Requires Int. Ex: 'itr 10'.", "0101"],
             "thr": ["Set Threshold. Requires Int. Ex: 'thr 1000'.", "0102"],
+            "clt": ["Set Collector Time Millis. Requires Int. Ex: 'clt 10", "0103"],
             "on":  ["Enable PEBS (core 1).", "0001"],
             "off": ["Disable PEBS (core 1).", "0201"],
             "branch_all": ["EVENT: Instructions Retired Branch All.", "23"],
-            "retired_all": ["EVENT: Instructions Retired All.", "13"]
+            "retired_all": ["EVENT: Instructions Retired All.", "13"],
         }
         print("WRITING MODE ([h|help|?] for help, [q|exit|quit] to quit)")
         print("The following words (inside []) will be replaced by codes.")
@@ -386,6 +388,13 @@ class EMShell():
         _, txt = self.cl.read()
         print("msg>" + txt)
 
+    def dummy_setup(self):
+        if not self.__cl_connected:
+            self.__connect()
+        self.cl.write("0100 13")  # evt retired_all
+        self.cl.write("0101 10")  # itr 10
+        self.cl.write("0102 10000")  # thr 10000
+        self.cl.write("0103 10")  # clt time millis 10
 
     def menu(self):
         print("[EventMonitorShell]")

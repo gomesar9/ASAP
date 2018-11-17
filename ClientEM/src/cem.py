@@ -2,12 +2,11 @@
 import win32file as w
 import configparser
 import time
-import matplotlib.pyplot as plt
 
 
-class EMClient():
+class ClientEm():
 
-    """Docstring for EMClient. """
+    """Docstring for ClientEm. """
 
     def __init__(self, exec_type="real" , debug=False):
         self.__exec_type = exec_type
@@ -17,7 +16,6 @@ class EMClient():
         self.__commands = dict()
         self.debug = debug
         self.config = dict()
-        self.__hard_config = dict()
 
         self.load_commands()
         self.load_configuration()
@@ -59,7 +57,7 @@ class EMClient():
 
         try:
             self.__em = w.CreateFile(
-                self.__hard_config["driver_full_path"], 
+                self.config["driver_full_path"], 
                 _desiredAccess,
                 _shareMode,
                 _attributes,
@@ -108,13 +106,12 @@ class EMClient():
         try:
             _ = cfgp.read(config_file)
 
-            self.__hard_config["driver_full_path"] = cfgp.get("EventMonitor", "fpath")
-            self.__hard_config["read_bytes"]       = int( cfgp.get("EventMonitor", "read_bytes") )
+            self.config["driver_full_path"] = cfgp.get("EventMonitor", "fpath")
+            self.config["read_bytes"]       = int( cfgp.get("EventMonitor", "read_bytes") )
             self.config["pebs_cores"]       = cfgp.get("EventMonitor", "cores")
 
-            self.config["interval"]         = float( cfgp.get(self.__exec_type, "interval") )
-            self.config["n_reads"]          = int( cfgp.get(self.__exec_type, "n_reads") )
-            self.config["collector_millis"] = int( cfgp.get(self.__exec_type, "collector_millis") )
+            self.config["interval"]     = float( cfgp.get(self.__exec_type, "interval") )
+            self.config["n_reads"]      = int( cfgp.get(self.__exec_type, "n_reads") )
 
             self.config["event"]        = cfgp.get("setup", "event")
             self.config["iteractions"]  = cfgp.get("setup", "iteractions")
@@ -130,7 +127,7 @@ class EMClient():
 
         """
         try:
-            hr, string = w.ReadFile(self.__em, self.__hard_config["read_bytes"], None)
+            hr, string = w.ReadFile(self.__em, self.config["read_bytes"], None)
             if hr != 0:
                 print("[!] w.ReadFile() error" + str(hr))
             else:
@@ -209,14 +206,9 @@ class EMClient():
             self.__commands["set_thr"], 
             self.config["threshold"]
             ))
-        # Collector milliseconds
-        self.write("{} {}".format(
-            self.__commands["set_cml"], 
-            self.config["collector_millis"]
-            ))
 
 
-    def start(self, out_data, plot=False):
+    def start(self):
         """TODO: Docstring for start.
 
         :returns: TODO
@@ -225,42 +217,23 @@ class EMClient():
         if not self.__connect_to_event_monitor():
             return False
 
-        if plot:
-            pause_func = plt.pause
-        else:
-            pause_func = time.sleep
-
         self.setup()
         # Do the stuff
         count = 0
-        print("Starting in 3..")
+        print("3...2..1")
         time.sleep(3)
-        self.write("enable_core1")  # TODO: Dinamic CORE
-
-        __check = 0
+        self.write("enable_core1")
         while count < self.config["n_reads"]:
-            data = self.read()
-            if data != b'-1':
-                print(data)
-                out_data.extend( [ int(x) for x in data.decode().split() ] )
+            x = self.read()
+            if x != b'-1':
+                print(x)
                 count += 1
-                __check = 0
-
-            __check += 1
-            if __check > self.config["n_reads"]*20:
-                print("EMERGENCY STOP")
-                if not self.__disconnect():
-                    print("Error in disconnect")
-                return False
-            pause_func( self.config["interval"] )
-
+            time.sleep(0.06)
 
         #self.write("disable_core1")
 
         if not self.__disconnect():
             return False
-
-        return True
 
 
     def it_write(self):

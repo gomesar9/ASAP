@@ -18,7 +18,7 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	PVOID userbuffer;
 	PIO_STACK_LOCATION PIO_STACK_IRP;
 	UINT32 datasize, sizerequired= 0;
-	CHAR msg[128];
+	CHAR msg[EMS_BUFFER_MAX_LENGHT+32];
 	NTSTATUS NtStatus = STATUS_SUCCESS;
 	// --+-- EMC use --+--
 	CHAR _cmdBfr[EMS_BUFFER_MAX_LENGHT + 1];
@@ -76,7 +76,8 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 	datasize = PIO_STACK_IRP->Parameters.Read.Length;
 
 	// --+-- BAND-AID --+--
-	return_code = get_samples(samples);
+	UINT32 CORE_TMP = 0;
+	return_code = get_samples(samples, CORE_TMP);  // TODO: Get ANY or ALL core samples. Removing param
 	if (return_code != 0) {
 //		sprintf(buff, "%llu", samples);
 //	} else {

@@ -38,6 +38,7 @@ class ClientEM():
         self.__exec_type = exec_type
 
         self.__em = None
+        self.__em_mode = None
         self.__driver_fpath = None
         self.__interval = None
         self.__n_reads = None
@@ -65,11 +66,13 @@ class ClientEM():
                 print("[!][D] ERROR: " + str(e))
 
 
-    def __connect_to_event_monitor(self, mode='read'):
-        if mode.lower() == 'read':
+    def __connect_to_event_monitor(self, mode='r'):
+        if mode.lower() == 'r':
             _desiredAccess = w.GENERIC_READ  # READ/WRITE/EXECUTE
-        elif mode.lower() == 'write':
+        elif mode.lower() == 'w':
             _desiredAccess = w.GENERIC_WRITE  # READ/WRITE/EXECUTE
+        elif mode.lower() == 'rw':
+            _desiredAccess = w.GENERIC_READ|w.GENERIC_WRITE  # READ/WRITE/EXECUTE
         else:
             print("[!] '__connect_to_event_monitor()' mode invalid") 
             return False
@@ -90,6 +93,7 @@ class ClientEM():
                 _flagsAndAttributes,
                 _hTemplateFile
             )
+            self.__em_mode = mode
         except Exception as e:
             print("[!] '__connect_to_event_monitor()' Error: " + str(e))
             return False
@@ -100,6 +104,7 @@ class ClientEM():
         if self.__em:
             w.CloseHandle(self.__em)
             self.__em = None
+            self.__em_mode = None
 
 
     def __parse_cores(self, cores):
@@ -163,15 +168,16 @@ class ClientEM():
     def enable_pebs(self):
         if not self.__is_pebs_enable:
             if self.__em:
-                print("[!] Driver already in use.")
-                return False
-            if not self.__connect_to_event_monitor(mode='write'):
+                if self.__em_mode == "r":
+                    print("[!] Driver already in use, in ONLY READ mode.")
+                    return False
+            elif not self.__connect_to_event_monitor(mode='rw'):
                 return False
 
             _start_message = '{}{}'.format(ClientEM.__START_CODE, self.__pebs_cores)
             errCod, nBytesWritten = w.WriteFile(self.__em, _start_message.encode(), None)
 
-            self.__disconnect_from_event_monitor()
+            #self.__disconnect_from_event_monitor()
             if errCod != 0:
                 print("Error :" + errCod)
                 return False
@@ -188,7 +194,7 @@ class ClientEM():
             if self.__em:
                 print("[!] Driver already in use.")
                 return False
-            if not self.__connect_to_event_monitor(mode='write'):
+            if not self.__connect_to_event_monitor(mode='w'):
                 return False
             # TODO: for now disable all cores, but it is possible disable just one
             _stop_message = '{}{}'.format(ClientEM.__STOP_CODE, self.__pebs_cores) 
@@ -199,6 +205,7 @@ class ClientEM():
                 print("Error :" + errCod)
                 return False
             else:
+                self.__is_pebs_enable = False
                 return True
         else:
             print("[!] PEBS is not enabled.")
@@ -212,25 +219,35 @@ class ClientEM():
                 return False
 
         try:
-            self.__enable_pebs()
-
-            if not __connect_to_event_monitor(mode='read'):
-                return False
-
+            self.last_run_data = [0]
             self.fig = plt.figure()
             self.ax = self.fig.add_subplot(1, 1, 1)
             an = animation.FuncAnimation( self.fig, anim, fargs=(self,) , interval = self.__interval*1000)
             plt.ion()
             plt.show()
+            time.sleep(1)
+            self.enable_pebs()
+
+            if not self.__em:
+                if not self.__connect_to_event_monitor(mode='r'):
+                    print("Not connected in read mode")
+                    return False
+            elif self.__em_mode == "w":
+                print("[!] Driver in ONLY WRITE mode.")
+                return False
+            
             for i in range(self.__n_reads):
                 hr, string = w.ReadFile(self.__em, self.__read_bytes, None)
     
                 if hr != 0:
                     print("[!] 'start()->w.ReadFile()' Error: " + str(e))
                 else:
-                    self.last_run_data.append(int(string))
+                    if int(string) > -1:
+                        self.last_run_data.append(int(string))
+                    
+                        
     
-                print(".", end='')
+                #print(".", end='')
                 #time.sleep(self.__interval)
                 plt.pause(self.__interval)
         
@@ -243,9 +260,10 @@ class ClientEM():
             plt.ioff()
             plt.show()
         except Exception as e:
-            pass
+            print(e)
         self.__disconnect_from_event_monitor()
-        self.__disable_pebs()
+        time.sleep(1)
+        self.disable_pebs()
 
         return True
  
@@ -274,9 +292,9 @@ class CEMShell():
 
 
     def __run(self):
-        t = threading.Thread(target=self.__cem.start)
-        t.start()
-        #self.__cem.start()
+        #t = threading.Thread(target=self.__cem.start)
+        #t.start()
+        self.__cem.start()
 
 
     def __config(self):
@@ -334,17 +352,19 @@ class CEMShell():
         print("[ClientEM Shell]")
         self.__help()
         print("'?', 'h' or 'help' for help. 'exit' or 'quit' for quit.")
-        try:
-            cmd = None
-            while (cmd != "exit" and cmd != "quit"):
+        
+        cmd = None
+        while (cmd != "exit" and cmd != "quit"):
+            try:
                 cmd = input("[CEMS]> ").lower()
 
                 if cmd in self.__cmds:
                     if self.debug:
                         print("[D] cmd: '{}'".format(self.__cmds[cmd]))
                     self.__cmds[cmd]()
-        except Exception as e:
-            print("[!] 'menu()' Error: " + str(e) )
+            except Exception as e:
+                print("[!] 'menu()' Error: " + str(e) )
+        
 
         self.__exit()
 
