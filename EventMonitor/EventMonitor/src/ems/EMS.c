@@ -265,7 +265,7 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 			st = PsCreateSystemThread(&thandle[core], GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)core);
 
 			if (NT_SUCCESS(st)) {
-				INTERRUPTS[0] = 0;
+				INTERRUPTS[core] = 0;
 				setFlag(F_EM_PEBS_ACTIVE);
 				st = PsCreateSystemThread(&thandleCollector[core], GENERIC_ALL, NULL, NULL, NULL, start_collector, &core);
 				if (!NT_SUCCESS(st)) {
@@ -282,6 +282,18 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 			debug("[EXC] Activating PEBS in 2th core.");
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 			core = 1;
+
+			st = PsCreateSystemThread(&thandle[core], GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)core);
+
+			if (NT_SUCCESS(st)) {
+				INTERRUPTS[core] = 0;
+				setFlag(F_EM_PEBS_ACTIVE);
+				st = PsCreateSystemThread(&thandleCollector[core], GENERIC_ALL, NULL, NULL, NULL, start_collector, &core);
+				if (!NT_SUCCESS(st)) {
+					debug("[!EXC] Failed to create collector thread!");
+					unhook_handler();
+				}
+			}
 		}
 
 		if ((emCmd.Event & 4) == 4) {
@@ -323,6 +335,12 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 			debug("[EXC] Deactivating PEBS in core 0.");
 			stop_pebs(0);
 			break;
+
+		case EM_STCFG_CORE1:
+			debug("[EXC] Deactivating PEBS in core 1.");
+			stop_pebs(1);
+			break;
+
 		default:
 			sprintf(dbgMsg, "[EXC] %d is not a valid Stop Configuration.", emCmd.Event);
 			debug(dbgMsg);
@@ -345,6 +363,10 @@ NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
 VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	UNREFERENCED_PARAMETER(Interrupt);
 	UNREFERENCED_PARAMETER(ServiceContext);
+	ULONG core;
+	/* identify current core */
+	//core = KeGetCurrentProcessorNumber();
+	core = 0;  // TODO: Change to dynamic
 
 	LARGE_INTEGER pa;
 	UINT32* APIC;
@@ -388,14 +410,14 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 
 	// Increment interrupt counter
 	KIRQL old;
-	ExAcquireSpinLock(&LOCK_INTERRUPT[0], &old);
+	ExAcquireSpinLock(&LOCK_INTERRUPT[core], &old);
 	INTERRUPTS[0]++;
-	KeReleaseSpinLock(&LOCK_INTERRUPT[0], old);
+	KeReleaseSpinLock(&LOCK_INTERRUPT[core], old);
 
 	//bfr_tick();			// IO data
 
 	// Re-enable PEBS
-	if (INTERRUPTS[0] < EM_SAFE_INTERRUPT_LIMIT) {
+	if (INTERRUPTS[core] < EM_SAFE_INTERRUPT_LIMIT) {
 		//DS_BASE->PEBS_BUFFER_BASE = PEBS_BUFFER;	// Theoretically not necessary
 
 #ifdef DEBUG_DEV //--------------------------------------------------------------------

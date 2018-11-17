@@ -235,7 +235,7 @@ class EMClient():
         count = 0
         print("Starting in 3..")
         time.sleep(3)
-        self.write("enable_core1")
+        self.write("enable_core1")  # TODO: Dinamic CORE
 
         __check = 0
         while count < self.config["n_reads"]:

@@ -18,16 +18,13 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 
 	// Get core information (number)
 	core = *((UINT32*)StartContext);
-	CHAR _msg[128];
-	sprintf(_msg, "[CLT] Core: %u.", core);
-	debug(_msg);
-	core = 0;
+
 	_interval.QuadPart = get_cfg_collector_millis().QuadPart * NEG_MILLI;
 	_cfg_collect_max = get_cfg_collect_max();
 
 #if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
 	CHAR _msg[128];
-	sprintf(_msg, "[CLT](I) ITR: %u.", _cfg_interrupt);
+	sprintf(_msg, "[CLT] Core: %u. ITR: %u.", core, _cfg_interrupt);
 	debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	//while (accumulator < _cfg_interrupt) {
