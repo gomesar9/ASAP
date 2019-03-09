@@ -99,6 +99,7 @@ typedef enum _EM_SUBTYPE {
 typedef struct st_EM_CMD {
 	EM_CMDTYPE Type;
 	EM_SUBTYPE Event;
+	UINT32 Cores;
 	INT Opt1, Opt2;
 }TEM_CMD, *PTEM_CMD;
 

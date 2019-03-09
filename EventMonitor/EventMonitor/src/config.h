@@ -16,17 +16,18 @@
 #define DRIVERNAME L"\\Device\\EventMonitor"		// driver name for windows subsystem
 #define DOSDRIVERNAME L"\\DosDevices\\EventMonitor" // driver name for ~DOS~ subsystem
 
-// FLAGS
-#define F_EM_PEBS_ACTIVE	1u
-#define F_EM_COLLECT_MAX	1u << 1
-#define F_EM_EVENT			1u << 2
-#define F_EM_THRESHOLD		1u << 3
-#define F_EM_COLLECT_MILLI	1u << 4
+// FLAGS PER CORE
+#define F_EM_PEBS_ACTIVE		1u
+#define F_EM_COLLECT_MAX		1u << 1
+#define F_EM_EVENT				1u << 2
+#define F_EM_THRESHOLD			1u << 3
+#define F_EM_COLLECT_MILLI		1u << 4
+#define F_EM_HOOK_INSTALLED		1u << 5
 
 #define F_EM_CONFIGURED (F_EM_COLLECT_MAX | F_EM_EVENT | F_EM_THRESHOLD | F_EM_COLLECT_MILLI)
 
-UINT32 FLAGS;
+UINT32 FLAGS0, FLAGS1, FLAGS2, FLAGS3;
 VOID init_config();
-VOID setFlag(UINT32 flag);
-BOOLEAN checkFlag(UINT32 flag);
-VOID clearFlag(UINT32 flag);
+VOID setFlag(UINT32 flag, UINT32 core);
+BOOLEAN checkFlag(UINT32 flag, UINT32 core);
+VOID clearFlag(UINT32 flag, UINT32 core);
