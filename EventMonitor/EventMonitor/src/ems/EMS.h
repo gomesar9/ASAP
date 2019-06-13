@@ -109,6 +109,18 @@ typedef struct st_EM_SAMPLE {
 	PCHAR Info;
 }EM_SAMPLE, *PEM_SAMPLE;
 
+typedef struct st_EM_CORE {
+    HANDLE Th_main,
+           Th_collector;
+    UINT32 Core,
+           Interrupts,
+           Collector_max,
+           Threshold,
+           Event;
+    LARGE_INTEGER Collector_millis;
+    KSPIN_LOCK Lock_interrupt;
+}TEM_CORE, *PTEM_CORE;
+
 /*
 ########################################################
 ### PART III
