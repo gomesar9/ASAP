@@ -7,30 +7,30 @@ VOID setFlag(UINT32 flag, UINT32 core) {
 	switch (core) {
 #ifdef ENABLE_CORE_0
 	case 0:
-		ExAcquireSpinLock(&_LOCK_FLAGS0, &tmp);
-		FLAGS0 |= flag;
-		KeReleaseSpinLock(&_LOCK_FLAGS0, tmp);
+		ExAcquireSpinLock(&(C0_CCFG->Lock_flags), &tmp);
+		C0_CCFG->Flags |= flag;
+		KeReleaseSpinLock(&(C0_CCFG->Lock_flags), tmp);
 		break;
 #endif
 #ifdef ENABLE_CORE_1
 	case 1:
-		ExAcquireSpinLock(&_LOCK_FLAGS1, &tmp);
-		FLAGS1 |= flag;
-		KeReleaseSpinLock(&_LOCK_FLAGS1, tmp);
+		ExAcquireSpinLock(&(C1_CCFG->Lock_flags), &tmp);
+		C1_CCFG->Flags |= flag;
+		KeReleaseSpinLock(&(C1_CCFG->Lock_flags), tmp);
 		break;
 #endif
 #ifdef ENABLE_CORE_2
 	case 2:
-		ExAcquireSpinLock(&_LOCK_FLAGS2, &tmp);
-		FLAGS2 |= flag;
-		KeReleaseSpinLock(&_LOCK_FLAGS2, tmp);
+		ExAcquireSpinLock(&(C2_CCFG->Lock_flags), &tmp);
+		C2_CCFG->Flags |= flag;
+		KeReleaseSpinLock(&(C2_CCFG->Lock_flags), tmp);
 		break;
 #endif
 #ifdef ENABLE_CORE_3
 	case 3:
-		ExAcquireSpinLock(&_LOCK_FLAGS3, &tmp);
-		FLAGS3 |= flag;
-		KeReleaseSpinLock(&_LOCK_FLAGS3, tmp);
+		ExAcquireSpinLock(&(C3_CCFG->Lock_flags), &tmp);
+		C3_CCFG->Flags |= flag;
+		KeReleaseSpinLock(&(C3_CCFG->Lock_flags), tmp);
 		break;
 #endif
 	default:
@@ -38,88 +38,80 @@ VOID setFlag(UINT32 flag, UINT32 core) {
 	}
 }
 
-BOOLEAN checkFlag(UINT32 flag, UINT32 core) {
+BOOLEAN checkFlag(UINT32 flag, UINT32 core, BOOLEAN fail) {
 	KIRQL tmp;
-	PUINT32 flags;
-	PKSPIN_LOCK lock;
+	BOOLEAN result = fail;
 
-    switch (core) {
+	switch (core) {
 #ifdef ENABLE_CORE_0
-    case 0:
-		lock = &_LOCK_FLAGS0;
-		flags = &FLAGS0;
-	    break;
+	case 0:
+		ExAcquireSpinLock(&(C0_CCFG->Lock_flags), &tmp);
+		result = (C0_CCFG->Flags & flag) == flag
+		KeReleaseSpinLock(&(C0_CCFG->Lock_flags), tmp);
+		break;
 #endif
 #ifdef ENABLE_CORE_1
-    case 1:
-		lock = &_LOCK_FLAGS1;
-		flags = &FLAGS1;
-        break;
+	case 1:
+		ExAcquireSpinLock(&(C1_CCFG->Lock_flags), &tmp);
+		result = (C1_CCFG->Flags & flag) == flag
+		KeReleaseSpinLock(&(C1_CCFG->Lock_flags), tmp);
+		break;
 #endif
 #ifdef ENABLE_CORE_2
-    case 2:
-		lock = &_LOCK_FLAGS2;
-		flags = &FLAGS2;
-        break;
+	case 2:
+		ExAcquireSpinLock(&(C2_CCFG->Lock_flags), &tmp);
+		result = (C2_CCFG->Flags & flag) == flag
+		KeReleaseSpinLock(&(C2_CCFG->Lock_flags), tmp);
+		break;
 #endif
 #ifdef ENABLE_CORE_3
-    case 3:
-		lock = &_LOCK_FLAGS3;
-		flags = &FLAGS3;
-        break;
+	case 3:
+		ExAcquireSpinLock(&(C3_CCFG->Lock_flags), &tmp);
+		result = (C3_CCFG->Flags & flag) == flag
+		KeReleaseSpinLock(&(C3_CCFG->Lock_flags), tmp);
+		break;
 #endif
-    default:
-        // Throws error
-        return FALSE;
-        break;
-    }
-
-	ExAcquireSpinLock(lock, &tmp);
-	if ((*flags & flag) == flag) {
-		KeReleaseSpinLock(lock, tmp);
-		return TRUE;
-	} else {
-		KeReleaseSpinLock(lock, tmp);
-		return FALSE;
+	default:
+		// Throws error ?
+		break;
 	}
+
+	return result;
 }
 
 VOID clearFlag(UINT32 flag, UINT32 core) {
 	KIRQL tmp;
-	PUINT32 flags;
-	PKSPIN_LOCK lock;
 
-    switch (core) {
+	switch (core) {
 #ifdef ENABLE_CORE_0
-    case 0:
-		lock = &_LOCK_FLAGS0;
-		flags = &FLAGS0;
-        break;
+	case 0:
+		ExAcquireSpinLock(&(C0_CCFG->Lock_flags), &tmp);
+		C0_CCFG->Flags = ~flag;
+		KeReleaseSpinLock(&(C0_CCFG->Lock_flags), tmp);
+		break;
 #endif
 #ifdef ENABLE_CORE_1
-    case 1:
-		lock = &_LOCK_FLAGS1;
-		flags = &FLAGS1;
-        break;
+	case 1:
+		ExAcquireSpinLock(&(C1_CCFG->Lock_flags), &tmp);
+		C1_CCFG->Flags = ~flag;
+		KeReleaseSpinLock(&(C1_CCFG->Lock_flags), tmp);
+		break;
 #endif
 #ifdef ENABLE_CORE_2
-    case 2:
-		lock = &_LOCK_FLAGS2;
-		flags = &FLAGS2;
-        break;
+	case 2:
+		ExAcquireSpinLock(&(C2_CCFG->Lock_flags), &tmp);
+		C2_CCFG->Flags = ~flag;
+		KeReleaseSpinLock(&(C2_CCFG->Lock_flags), tmp);
+		break;
 #endif
 #ifdef ENABLE_CORE_3
-    case 3:
-		lock = &_LOCK_FLAGS3;
-		flags = &FLAGS3;
-        break;
+	case 3:
+		ExAcquireSpinLock(&(C3_CCFG->Lock_flags), &tmp);
+		C3_CCFG->Flags = ~flag;
+		KeReleaseSpinLock(&(C3_CCFG->Lock_flags), tmp);
+		break;
 #endif
-    default:
-        return;
-        break;
+	default:
+		break;
 	}
-
-	ExAcquireSpinLock(lock, &tmp);
-	*flags &= ~flag;
-	KeReleaseSpinLock(lock, tmp);
 }

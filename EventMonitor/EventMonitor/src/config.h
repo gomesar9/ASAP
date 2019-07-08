@@ -38,12 +38,19 @@ typedef struct st_EM_CCFG {
     HANDLE Th_main,
            Th_collector;
     UINT32 Core,
-           Interrupts,
            Collector_max,
            Threshold,
-           Event_code;  // Mapped PEBS event code
+           Event_code,  // Mapped PEBS event code
+           Interrupts,
+           Flags;
     TEPEBS_EVENTS PE_event;  // Real PEBS event code
     LARGE_INTEGER Collector_millis;
-    KSPIN_LOCK Lock_interrupt;
+    KSPIN_LOCK Lock_interrupts,
                Lock_flags;
 }TEM_CCFG, *PTEM_CCFG;
+
+// Sorry
+PTEM_CCFG C0_CCFG;
+PTEM_CCFG C1_CCFG;
+PTEM_CCFG C2_CCFG;
+PTEM_CCFG C3_CCFG;
