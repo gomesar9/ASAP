@@ -35,7 +35,8 @@ LARGE_INTEGER get_cfg_collector_millis(UINT32 core) {
 VOID initialize_em() {
 	// TODO: Enable only setted in config.h by "ENABLE_CORE[0-3]" definition
 	for (UINT32 i=0; i < MAX_CORE_QTD; i++) {
-		CCFG[i] = TEM_CCFG;
+		TEM_CCFG ccfg;
+		*CCFG[i] = ccfg;
 		CCFG[i]->Th_main = NULL;
 		CCFG[i]->Th_collector = NULL;
 		CCFG[i]->Core = i;
@@ -150,7 +151,7 @@ NTSTATUS em_configure(_In_ PTEM_CMD emCmd, _Out_ PTEM_CCFG cfg) {
 
 	// #########################################################################
 	// 1) Configure Collect MAX
-	case EM_CFG_COLLECT_MAX
+    case EM_CFG_COLLECT_MAX:
 #if EMS_DEBUG > 0 //--------------------
 		sprintf(dbgMsg, "[EXC] EM_CFG_COLLECT_MAX: %u.", emCmd->Opt1);
 		debug(dbgMsg);
@@ -216,38 +217,37 @@ NTSTATUS em_start(_In_ PTEM_CCFG cfg) {
 	}
 
 #if EMS_DEBUG >= 0 //-------------------
-		sprintf(dbgMsg, "[EXC] Activating PEBS in %dth core.", core);
-		debug(dbgMsg);
+	sprintf(dbgMsg, "[EXC] Activating PEBS in %dth core.", core);
+	debug(dbgMsg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-		if (checkFlag(F_EM_PEBS_ACTIVE, core)) {
-			sprintf(dbgMsg, "[!EXC] PEBS Core %d Already ACTIVE!", core);
-			debug(dbgMsg);
-			return CHANGE_ME;
-		}
+	if (checkFlag(F_EM_PEBS_ACTIVE, core)) {
+		sprintf(dbgMsg, "[!EXC] PEBS Core %d Already ACTIVE!", core);
+		debug(dbgMsg);
+		return CHANGE_ME;
+	}
 
+	st = PsCreateSystemThread(
+		&(cfg->Th_main),
+		GENERIC_ALL,
+		NULL, NULL, NULL,
+		StarterThread,
+		(VOID*)core
+	);
+
+	if (NT_SUCCESS(st)) {
+		cfg->Interrupts = 0;
+		setFlag(F_EM_PEBS_ACTIVE, core);
 		st = PsCreateSystemThread(
-			&(cfg->Th_main),
+			&(cfg->Th_collector),
 			GENERIC_ALL,
 			NULL, NULL, NULL,
-			StarterThread,
-			(VOID*)core
+			start_collector,
+			&core
 		);
 
-		if (NT_SUCCESS(st)) {
-			cfg->Interrupts = 0;
-			setFlag(F_EM_PEBS_ACTIVE, core);
-			st = PsCreateSystemThread(
-				&(cfg->Th_collector),
-				GENERIC_ALL,
-				NULL, NULL, NULL,
-				start_collector,
-				&core
-			);
-
-			if (!NT_SUCCESS(st)) {
-				debug("[!EXC] Failed to create collector thread!");
-				//unhook_handler();
-			}
+		if (!NT_SUCCESS(st)) {
+			debug("[!EXC] Failed to create collector thread!");
+			//unhook_handler();
 		}
 	}
 
@@ -274,7 +274,7 @@ NTSTATUS em_stop(_In_ UINT32 core) {
 
 
 NTSTATUS execute(_In_ PTEM_CMD emCmd) {
-	NTSTATUS st = STATUS_SUCCESS
+	NTSTATUS st = STATUS_SUCCESS;
 	NTSTATUS CHANGE_ME = STATUS_FAIL_CHECK;
 	CHAR dbgMsg[128];
 
@@ -288,10 +288,10 @@ NTSTATUS execute(_In_ PTEM_CMD emCmd) {
 			em_configure(emCmd, CCFG[core]);
 
 		} else if (emCmd->Type == EM_CMD_START) {
-			em_start(CCFG[core])
+			em_start(CCFG[core]);
 
 		} else if (emCmd->Type == EM_CMD_STOP) {
-			em_stop(CCFG[core]->Core)
+			em_stop(CCFG[core]->Core);
 		}
 	}
 	return st;

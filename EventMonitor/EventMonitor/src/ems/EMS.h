@@ -2,7 +2,6 @@
 #include "events.h"
 #include "../config.h"
 #include "../cmd/cmd.h"
-#include <intrin.h>
 
 
 // --+-- DEBUG --+--
@@ -94,10 +93,6 @@ typedef struct st_DSBASE {
 
 #define _NUM_EVENTS 45
 #define CFG_INVALID_EVENT_CODE 0
-typedef struct _UPEBS_EVENT {
-	UINT32 Code;
-	TEPEBS_EVENTS Event;
-}TPEBS_EVT_MAP, *PTPEBS_EVT_MAP;
 
 /*
 Functions
@@ -109,13 +104,13 @@ NTSTATUS em_stop(_In_ UINT32 core);
 NTSTATUS execute(_In_ PTEM_CMD emCmd);
 //NTSTATUS sample(PANSI_STRING info);
 
-UINT32 get_cfg_collect_max();
-LARGE_INTEGER get_cfg_collector_millis();
+UINT32 get_cfg_collect_max(UINT32 core);
+LARGE_INTEGER get_cfg_collector_millis(UINT32 core);
 VOID initialize_em();
 BOOLEAN get_interrupts(_Out_ PUINT32 collect, UINT32 core);
 VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext);
-VOID hook_handler();
-VOID unhook_handler();
+VOID hook_handler(UINT32 core);
+VOID unhook_handler(UINT32 core);
 VOID thread_attach_to_core(uintptr_t id);
 VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer);
 VOID StarterThread(_In_ PVOID StartContext);

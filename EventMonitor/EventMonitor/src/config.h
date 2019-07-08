@@ -3,9 +3,11 @@
 #include <fltKernel.h>
 #include <dontuse.h>
 #include <suppress.h>
+#include <intrin.h>
 #include <stdio.h>
 #include "dbg/debug.h"
 #include "stdlib.h" // Needed for atoi()
+
 
 //#define DEBUG_DEV 1		// Define if development prints are enabled (To find some specific behavior)
 #define DEBUG 1			// Define if debug info will be printed
@@ -33,6 +35,12 @@
 #define F_EM_HOOK_INSTALLED		1u << 5
 
 #define F_EM_CONFIGURED (F_EM_COLLECT_MAX | F_EM_EVENT | F_EM_THRESHOLD | F_EM_COLLECT_MILLI)
+
+// Mapping events
+typedef struct _UPEBS_EVENT {
+	UINT32 Code;
+	TEPEBS_EVENTS Event;
+}TPEBS_EVT_MAP, *PTPEBS_EVT_MAP;
 
 // Event Monitor Core Configuration
 typedef struct st_EM_CCFG {
