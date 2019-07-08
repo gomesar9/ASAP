@@ -25,6 +25,10 @@ PTDS_BASE DS_BASE;						// PEBS Base
 PTPEBS_BUFFER PEBS_BUFFER;				// PEBS Buffer
 KSPIN_LOCK LOCK_INTERRUPT[CORE_QTD];	// Spin Lock for INTERRUPTS
 
+PTEM_CCFG C0_CCFG;
+PTEM_CCFG C1_CCFG;
+PTEM_CCFG C2_CCFG;
+PTEM_CCFG C3_CCFG;
 
 UINT32 get_cfg_collect_max(UINT32 core) {
 	return CFG_COLLECT_MAX[core];
@@ -37,16 +41,62 @@ LARGE_INTEGER get_cfg_collector_millis() {
 
 
 VOID initialize_em() {
-	CFG_EVENT.Code = CFG_INVALID_EVENT_CODE;
-	CFG_EVENT.Event = _PE_INVALID_EVENT;
-	CFG_THRESHOLD = 0;
-	
-	CFG_COLLECT_MILLI.QuadPart = 10;
-	for (size_t i = 0; i < CORE_QTD; i++) {
-		INTERRUPTS[i] = 0;
-		CFG_COLLECT_MAX[i] = 0;
-		KeInitializeSpinLock(&LOCK_INTERRUPT[i]);
-	}
+#ifdef ENABLE_CORE_0
+    C0_CCFG = TEM_CCFG;
+    C0_CCFG->Th_main = NULL;
+    C0_CCFG->Th_collector = NULL;
+    C0_CCFG->Core = 0;
+    C0_CCFG->Interrupts = 0;
+    C0_CCFG->Collector_max = 0;
+    C0_CCFG->Threshold = 0;
+    C0_CCFG->PE_event = _PE_INVALID_EVENT;
+    C0_CCFG->Event_code = CFG_INVALID_EVENT_CODE;
+    C0_CCFG->Collector_millis.QuadPart = 10;
+	KeInitializeSpinLock(&(C0_CCFG->Lock_interrupt));
+	KeInitializeSpinLock(&(C0_CCFG->Lock_flags));
+#endif
+#ifdef ENABLE_CORE_1
+    C1_CCFG = TEM_CCFG;
+    C1_CCFG->Th_main = NULL;
+    C1_CCFG->Th_collector = NULL;
+    C1_CCFG->Core = 0;
+    C1_CCFG->Interrupts = 0;
+    C1_CCFG->Collector_max = 0;
+    C1_CCFG->Threshold = 0;
+    C1_CCFG->PE_event = _PE_INVALID_EVENT;
+    C1_CCFG->Event_code = CFG_INVALID_EVENT_CODE;
+    C1_CCFG->Collector_millis.QuadPart = 10;
+	KeInitializeSpinLock(&(C1_CCFG->Lock_interrupt));
+	KeInitializeSpinLock(&(C1_CCFG->Lock_flags));
+#endif
+#ifdef ENABLE_CORE_2
+    C2_CCFG = TEM_CCFG;
+    C2_CCFG->Th_main = NULL;
+    C2_CCFG->Th_collector = NULL;
+    C2_CCFG->Core = 0;
+    C2_CCFG->Interrupts = 0;
+    C2_CCFG->Collector_max = 0;
+    C2_CCFG->Threshold = 0;
+    C2_CCFG->PE_event = _PE_INVALID_EVENT;
+    C2_CCFG->Event_code = CFG_INVALID_EVENT_CODE;
+    C2_CCFG->Collector_millis.QuadPart = 10;
+	KeInitializeSpinLock(&(C2_CCFG->Lock_interrupt));
+	KeInitializeSpinLock(&(C2_CCFG->Lock_flags));
+#endif
+#ifdef ENABLE_CORE_3
+    C3_CCFG = TEM_CCFG;
+    C3_CCFG->Th_main = NULL;
+    C3_CCFG->Th_collector = NULL;
+    C3_CCFG->Core = 0;
+    C3_CCFG->Interrupts = 0;
+    C3_CCFG->Collector_max = 0;
+    C3_CCFG->Threshold = 0;
+    C3_CCFG->PE_event = _PE_INVALID_EVENT;
+    C3_CCFG->Event_code = CFG_INVALID_EVENT_CODE;
+    C3_CCFG->Collector_millis.QuadPart = 10;
+	KeInitializeSpinLock(&(C3_CCFG->Lock_interrupt));
+	KeInitializeSpinLock(&(C3_CCFG->Lock_flags));
+#endif
 }
 
 

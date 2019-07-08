@@ -32,3 +32,18 @@
 #define F_EM_HOOK_INSTALLED		1u << 5
 
 #define F_EM_CONFIGURED (F_EM_COLLECT_MAX | F_EM_EVENT | F_EM_THRESHOLD | F_EM_COLLECT_MILLI)
+
+// Event Monitor Core Configuration
+typedef struct st_EM_CCFG {
+    HANDLE Th_main,
+           Th_collector;
+    UINT32 Core,
+           Interrupts,
+           Collector_max,
+           Threshold,
+           Event_code;  // Mapped PEBS event code
+    TEPEBS_EVENTS PE_event;  // Real PEBS event code
+    LARGE_INTEGER Collector_millis;
+    KSPIN_LOCK Lock_interrupt;
+               Lock_flags;
+}TEM_CCFG, *PTEM_CCFG;

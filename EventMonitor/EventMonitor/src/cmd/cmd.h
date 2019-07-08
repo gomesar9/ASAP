@@ -35,16 +35,3 @@ typedef struct st_EM_CMD {
 	INT Opt1, Opt2;
 	CHAR[MAX_CMD_OPT_STR_LEN] Opt_str;
 }TEM_CMD, *PTEM_CMD;
-
-// Event Monitor Core Configuration
-typedef struct st_EM_CCFG {
-    HANDLE Th_main,
-           Th_collector;
-    UINT32 Core,
-           Interrupts,
-           Collector_max,
-           Threshold,
-           Event;
-    LARGE_INTEGER Collector_millis;
-    KSPIN_LOCK Lock_interrupt;
-}TEM_CCFG, *PTEM_CCFG;

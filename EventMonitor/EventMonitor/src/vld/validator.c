@@ -1,7 +1,8 @@
 #include "validator.h"
 #include "../config.h"
-#include "../cmd/cmd.h"
 #include "../dbg/debug.h"
+#include "../ems/lockers.h"
+#include "../cmd/cmd.h"
 
 
 INT32 check_cores_actives(UINT32 cmdCores) {

@@ -1,26 +1,6 @@
 #include "../config.h"
 #include "lockers.h"
 
-KSPIN_LOCK _LOCK_FLAGS0;
-KSPIN_LOCK _LOCK_FLAGS1;
-KSPIN_LOCK _LOCK_FLAGS2;
-KSPIN_LOCK _LOCK_FLAGS3;
-
-
-VOID init_config() {
-#ifdef ENABLE_CORE_0
-	KeInitializeSpinLock(&_LOCK_FLAGS0);
-#endif
-#ifdef ENABLE_CORE_1
-	KeInitializeSpinLock(&_LOCK_FLAGS1);
-#endif
-#ifdef ENABLE_CORE_2
-	KeInitializeSpinLock(&_LOCK_FLAGS2);
-#endif
-#ifdef ENABLE_CORE_3
-	KeInitializeSpinLock(&_LOCK_FLAGS3);
-#endif
-}
 
 VOID setFlag(UINT32 flag, UINT32 core) {
 	KIRQL tmp;
