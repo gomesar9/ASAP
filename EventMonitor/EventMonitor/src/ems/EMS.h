@@ -102,8 +102,11 @@ typedef struct _UPEBS_EVENT {
 /*
 Functions
 */
-NTSTATUS _unpack(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _Out_ PTEM_CMD emCmd, _In_ UINT16 datasize);
-NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize);
+
+NTSTATUS em_configure(_In_ PTEM_CMD emCmd, _Out_ PTEM_CCFG cfg);
+NTSTATUS em_start(_In_ PTEM_CCFG cfg);
+NTSTATUS em_stop(_In_ UINT32 core);
+NTSTATUS execute(_In_ PTEM_CMD emCmd);
 //NTSTATUS sample(PANSI_STRING info);
 
 UINT32 get_cfg_collect_max();

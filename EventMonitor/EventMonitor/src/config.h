@@ -17,6 +17,7 @@
 #define DOSDRIVERNAME L"\\DosDevices\\EventMonitor" // driver name for ~DOS~ subsystem
 
 // CORE MANAGEMENT
+#define MAX_CORE_QTD 4
 #define ENABLE_CORE_0 1
 #define ENABLE_CORE_1 1
 #define ENABLE_CORE_2 1
@@ -40,17 +41,13 @@ typedef struct st_EM_CCFG {
     UINT32 Core,
            Collector_max,
            Threshold,
-           Event_code,  // Mapped PEBS event code
            Interrupts,
            Flags;
-    TEPEBS_EVENTS PE_event;  // Real PEBS event code
+    TEPEBS_EVT_MAP Event_map;  // Real PEBS event code
     LARGE_INTEGER Collector_millis;
     KSPIN_LOCK Lock_interrupts,
                Lock_flags;
 }TEM_CCFG, *PTEM_CCFG;
 
 // Sorry
-PTEM_CCFG C0_CCFG;
-PTEM_CCFG C1_CCFG;
-PTEM_CCFG C2_CCFG;
-PTEM_CCFG C3_CCFG;
+PTEM_CCFG CCFG[MAX_CORE_QTD];
