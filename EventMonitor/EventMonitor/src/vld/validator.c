@@ -1,4 +1,5 @@
 #include "validator.h"
+#include "../cmd/cmd.h"
 #include "../dbg/debug.h"
 
 
@@ -18,7 +19,6 @@ INT32 check_cores_actives(UINT32 cmdCores) {
 }
 
 
-// TODO: Implementar regras de validação, recebendo de IO, enviando para EMS ou para Buffer
 NTSTATUS validate_input(_In_ PCHAR userinput, _In_ UINT32 datasize) {
 	NTSTATUS st = STATUS_SUCCESS, CHANGE_ME = STATUS_FAIL_CHECK;
 	TEM_CMD emCmd;
@@ -67,16 +67,16 @@ NTSTATUS validate_input(_In_ PCHAR userinput, _In_ UINT32 datasize) {
 		_bff[idx] = '\0'; // Assurance
 		if (idx > 0) {
 			emCmd->Opt1 = atoi(_bff);
-#ifdef DEBUG_DEV //--------------------------------------------------------------------
+#ifdef DEBUG_DEV //-------------------------------------------------------------
 			sprintf(dbgmsg, "[UPK]: %d.", emCmd->Opt1);
 			debug(dbgmsg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
             em_configure(emCmd);
         } else {
 		    return CHANGE_ME;
         }
     
-
+    // Stop CMD ################################################################
 	if (emCmd->Type == EM_CMD_STOP) {
         // Call stop if is running
         // All setted cores must be actives
