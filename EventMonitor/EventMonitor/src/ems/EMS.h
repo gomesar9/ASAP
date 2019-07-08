@@ -1,5 +1,6 @@
 #pragma once
 #include "../config.h"
+#include "../cmd/cmd.h"
 #include <intrin.h>
 
 
@@ -68,62 +69,6 @@ typedef struct st_DSBASE {
 /*
 ########################################################
 ### PART II
-*/
-
-/* Enums */
-typedef enum _EM_CMD_TYPE {
-	EM_CMD_START,	// 00
-	EM_CMD_CFG,		// 01
-	EM_CMD_STOP,	// 02
-	EM_CMD_NULL		// 03
-}EM_CMDTYPE, *PEM_CMDTYPE;
-
-// Enum (options) for EM_CMD_START
-typedef enum _START_CFG {
-	EM_STCFG_CORE0 = 1,
-	EM_STCFG_CORE1 = 1<<1,
-	EM_STCFG_CORE2 = 1<<2,
-	EM_STCFG_CORE3 = 1<<3
-}START_CFG, *PSTART_CFG;
-
-// Enum (options) for EM_CMD_SET
-typedef enum _EM_SUBTYPE {
-	EM_CFG_EVT,				// 00
-	EM_CFG_COLLECT_MAX,		// 01
-	EM_CFG_THRESHOLD,		// 02
-	EM_CFG_COLLECT_MILLI,	// 03
-	EM_EVT_NULL				// 04
-}EM_SUBTYPE, *PEM_SUBTYPE;
-
-/* Structs */
-typedef struct st_EM_CMD {
-	EM_CMDTYPE Type;
-	EM_SUBTYPE Event;
-	UINT32 Cores;
-	INT Opt1, Opt2;
-}TEM_CMD, *PTEM_CMD;
-
-typedef struct st_EM_SAMPLE {
-	EM_SUBTYPE Event;
-	ULONG Counter;
-	PCHAR Info;
-}EM_SAMPLE, *PEM_SAMPLE;
-
-typedef struct st_EM_CORE {
-    HANDLE Th_main,
-           Th_collector;
-    UINT32 Core,
-           Interrupts,
-           Collector_max,
-           Threshold,
-           Event;
-    LARGE_INTEGER Collector_millis;
-    KSPIN_LOCK Lock_interrupt;
-}TEM_CORE, *PTEM_CORE;
-
-/*
-########################################################
-### PART III
 */
 
 #define DISABLE_PEBS 0
