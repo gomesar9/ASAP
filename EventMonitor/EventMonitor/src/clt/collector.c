@@ -19,8 +19,8 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 	// Get core information (number)
 	core = *((UINT32*)StartContext);
 
-	_interval.QuadPart = get_cfg_collector_millis().QuadPart * NEG_MILLI;
-	_cfg_collect_max = get_cfg_collect_max();
+	_interval.QuadPart = get_cfg_collector_millis(core).QuadPart * NEG_MILLI;
+	_cfg_collect_max = get_cfg_collect_max(core);
 
 #if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
 	CHAR _msg[128];
@@ -73,6 +73,6 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 	//sprintf(_msg, "[CLT](F) Accumulator: %u.", accumulator);
 	//debug(_msg);
 
-	stop_pebs(0); //TODO: Adjust to specified core
+	stop_pebs(core);
 	return STATUS_SUCCESS;
 }
