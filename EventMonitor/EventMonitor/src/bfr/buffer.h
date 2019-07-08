@@ -11,7 +11,6 @@ int bfr_destroy();
 #ifdef REFAC
 #define SAMPLE_MAX 10
 #define SAMPLES_QTD 3
-#define CORE_QTD 4
 typedef struct _ST_SAMPLES {
 	UINT32 count[SAMPLE_MAX];
 	UINT32 time;

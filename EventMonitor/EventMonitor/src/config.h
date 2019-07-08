@@ -16,6 +16,13 @@
 #define DRIVERNAME L"\\Device\\EventMonitor"		// driver name for windows subsystem
 #define DOSDRIVERNAME L"\\DosDevices\\EventMonitor" // driver name for ~DOS~ subsystem
 
+// CORE MANAGEMENT
+#define ENABLE_CORE_0 1
+#define ENABLE_CORE_1 1
+#define ENABLE_CORE_2 1
+#define ENABLE_CORE_3 1
+#define CORE_QTD ENABLE_CORE_0 + ENABLE_CORE_1 + ENABLE_CORE_2 + ENABLE_CORE_3
+
 // FLAGS PER CORE
 #define F_EM_PEBS_ACTIVE		1u
 #define F_EM_COLLECT_MAX		1u << 1

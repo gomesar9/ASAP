@@ -1,4 +1,5 @@
 #include "validator.h"
+#include "../config.h"
 #include "../cmd/cmd.h"
 #include "../dbg/debug.h"
 
