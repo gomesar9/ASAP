@@ -51,7 +51,7 @@ typedef struct st_EM_CCFG {
            Threshold,
            Interrupts,
            Flags;
-    TEPEBS_EVT_MAP Event_map;  // Real PEBS event code
+    TPEBS_EVT_MAP Event_map;  // Real PEBS event code
     LARGE_INTEGER Collector_millis;
     KSPIN_LOCK Lock_interrupts,
                Lock_flags;
