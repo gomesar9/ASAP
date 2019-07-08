@@ -1,4 +1,5 @@
 #include "EMS.h"
+#include "lockers.h"
 #include "../config.h"
 #include "../bfr/buffer.h"
 #include "../clt/collector.h"

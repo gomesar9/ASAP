@@ -32,9 +32,3 @@
 #define F_EM_HOOK_INSTALLED		1u << 5
 
 #define F_EM_CONFIGURED (F_EM_COLLECT_MAX | F_EM_EVENT | F_EM_THRESHOLD | F_EM_COLLECT_MILLI)
-
-UINT32 FLAGS0, FLAGS1, FLAGS2, FLAGS3;
-VOID init_config();
-VOID setFlag(UINT32 flag, UINT32 core);
-BOOLEAN checkFlag(UINT32 flag, UINT32 core);
-VOID clearFlag(UINT32 flag, UINT32 core);

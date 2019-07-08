@@ -1,5 +1,5 @@
 #include "../config.h"
-#include "../bfr/buffer.h"
+#include "lockers.h"
 
 KSPIN_LOCK _LOCK_FLAGS0;
 KSPIN_LOCK _LOCK_FLAGS1;
