@@ -46,7 +46,7 @@ NTSTATUS validate_input(_In_ CHAR userinput[MAX_USER_INPUT_LEN], _In_ UINT32 dat
 	debug(dbgmsg);
 
 	UINT32 actives = check_cores_actives(emCmd.Cores);
-	UINT32 target_actives = emCmd.Cores && actives;
+	UINT32 target_actives = emCmd.Cores & actives;
 	sprintf(dbgmsg, "[Target_actives]: %u.", target_actives);
 	debug(dbgmsg);
 

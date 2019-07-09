@@ -17,9 +17,6 @@
 
 PTDS_BASE DS_BASE;						// PEBS Base
 PTPEBS_BUFFER PEBS_BUFFER;				// PEBS Buffer
-TPEBS_EVT_MAP CFG_EVENT;				// PEBS Event Code
-UINT32 CFG_THRESHOLD;					// Events to trigger one interruption
-LARGE_INTEGER CFG_COLLECT_MILLI;		// Collector sleep time
 
 
 UINT32 get_cfg_collect_max(UINT32 core) {
@@ -105,8 +102,9 @@ NTSTATUS stop_pebs(_In_ INT core) {
 	
 	clearFlag(F_EM_PEBS_ACTIVE, core);
 
-	// uninstall hook after stop Thread if no there are no PEBS active
-	if (!checkFlag(F_EM_PEBS_ACTIVE || F_EM_PEBS_ACTIVE || F_EM_PEBS_ACTIVE || F_EM_PEBS_ACTIVE, core) && checkFlag(F_EM_HOOK_INSTALLED, core)) {
+	// uninstall hook after stop Thread if there are no PEBS active.
+	// TODO: Check all cores
+	if (!checkFlag(F_EM_PEBS_ACTIVE, core) && checkFlag(F_EM_HOOK_INSTALLED, core)) {
 		unhook_handler(core);
 	}
 	
@@ -281,7 +279,7 @@ NTSTATUS execute(_In_ PTEM_CMD emCmd) {
 
 	for (UINT32 core = 0; core < CORE_QTD; core++)
 	{
-		if (!(emCmd->Cores && (1u << core))) {
+		if (!(emCmd->Cores & (1u << core))) {
 			continue;
 		}
 
@@ -355,6 +353,9 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	CCFG[core].Interrupts++;
 	KeReleaseSpinLock(&(CCFG[core].Lock_interrupts), old);
 
+	char _msg[128];
+	sprintf(_msg, "--- PMI --- [Core %d]", core);
+	debug(_msg);
 	//bfr_tick();			// IO data
 
 	// Re-enable PEBS
@@ -393,7 +394,7 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 		//DS_BASE->PEBS_INDEX = DS_BASE->PEBS_BUFFER_BASE;	// Reset index
 
 		// --+-- Enable PEBS --+--
-		__writemsr(MSR_IA32_PERFCTR0, CFG_THRESHOLD);
+		__writemsr(MSR_IA32_PERFCTR0, CCFG[core].Threshold);
 		__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
 		__writemsr(MSR_IA32_GLOBAL_CTRL, ENABLE_PEBS);
 #ifdef DEBUG_DEV //--------------------------------------------------------------------
@@ -497,11 +498,11 @@ VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer) {
 	ds_base->PEBS_MAXIMUM = pebs_buffer + 1;
 	ds_base->PEBS_THRESHOLD = pebs_buffer;	// Inactive, I think..
 #endif
-	ds_base->PEBS_CTR0_RST = CFG_THRESHOLD;
+	ds_base->PEBS_CTR0_RST = CCFG[0].Threshold;  // TODO: Make multi-core friendly
 #ifdef NEHALEM_NEW_FIELDS
-	ds_base->PEBS_CTR1_RST = CFG_THRESHOLD;
-	ds_base->PEBS_CTR2_RST = CFG_THRESHOLD;
-	ds_base->PEBS_CTR3_RST = CFG_THRESHOLD;
+	ds_base->PEBS_CTR1_RST = CCFG[0].Threshold;
+	ds_base->PEBS_CTR2_RST = CCFG[0].Threshold;
+	ds_base->PEBS_CTR3_RST = CCFG[0].Threshold;
 #endif
 
 #ifdef DEBUG_DEV
@@ -553,7 +554,7 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	__writemsr(MSR_IA32_GLOBAL_CTRL, DISABLE_PEBS);
 	
 	// Set threshold (counter) and events
-	__writemsr(MSR_IA32_PERFCTR0, CFG_THRESHOLD);
+	__writemsr(MSR_IA32_PERFCTR0, CCFG[core].Threshold);
 
 #ifdef DEBUG_DEV
 	// IA32_PMC0 = 0
@@ -566,16 +567,18 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	debug(_msg);
 #endif
 	//__writemsr(MSR_IA32_EVNTSEL0, PEBS_EVENT | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
-	__writemsr(MSR_IA32_EVNTSEL0, CFG_EVENT.Event | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
+	__writemsr(MSR_IA32_EVNTSEL0, CCFG[core].Event_map.Event | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
 
 	// Enable PEBS
 	__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
 	__writemsr(MSR_IA32_GLOBAL_CTRL, ENABLE_PEBS);
-#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-	debug("PEBS setado");
+#if EMS_DEBUG >= 0 //------------------------------------------------------------------
+	CHAR dbgMsg[128];
+	sprintf(dbgMsg, "[StarterThread] PEBS setted on core %lld", core);
+	debug(dbgMsg);
 #endif //------------------------------------------------------------------------------
-
 }
+
 
 VOID StopperThread(_In_ PVOID StartContext) {
 	//int core;
@@ -593,8 +596,10 @@ VOID StopperThread(_In_ PVOID StartContext) {
 	ExFreePoolWithTag(PEBS_BUFFER, 'PBF'); // Buffer
 	ExFreePoolWithTag(DS_BASE, 'DSB');	// Struct
 
-#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-	debug("Thread stopped. Resources FREE");
+#if EMS_DEBUG >= 0 //------------------------------------------------------------------
+	CHAR dbgMsg[128];
+	sprintf(dbgMsg, "[StopperThread] Thread stopped on core %lld", core);
+	debug(dbgMsg);
 #endif //------------------------------------------------------------------------------
 }
 
