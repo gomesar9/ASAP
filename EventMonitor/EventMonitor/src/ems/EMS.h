@@ -1,5 +1,4 @@
 #pragma once
-#include "events.h"
 #include "../config.h"
 #include "../cmd/cmd.h"
 
@@ -98,10 +97,10 @@ typedef struct st_DSBASE {
 Functions
 */
 
-NTSTATUS em_configure(_In_ PTEM_CMD emCmd, _Out_ PTEM_CCFG cfg);
-NTSTATUS em_start(_In_ PTEM_CCFG cfg);
-NTSTATUS em_stop(_In_ UINT32 core);
-NTSTATUS execute(_In_ PTEM_CMD emCmd);
+NTSTATUS em_configure(_In_ PTEM_CMD, _Out_ PTEM_CCFG);
+NTSTATUS em_start(_In_ PTEM_CCFG);
+NTSTATUS em_stop(_In_ UINT32);
+NTSTATUS execute(_In_ PTEM_CMD);
 //NTSTATUS sample(PANSI_STRING info);
 
 UINT32 get_cfg_collect_max(UINT32 core);

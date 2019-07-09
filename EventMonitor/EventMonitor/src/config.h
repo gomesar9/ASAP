@@ -37,6 +37,12 @@
 
 #define F_EM_CONFIGURED (F_EM_COLLECT_MAX | F_EM_EVENT | F_EM_THRESHOLD | F_EM_COLLECT_MILLI)
 
+// Event Map
+typedef struct _UPEBS_EVENT {
+	UINT32 Code;
+	TEPEBS_EVENTS Event;
+}TPEBS_EVT_MAP, *PTPEBS_EVT_MAP;
+
 // Event Monitor Core Configuration
 typedef struct st_EM_CCFG {
     HANDLE Th_main,

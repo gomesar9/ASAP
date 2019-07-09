@@ -88,7 +88,7 @@ DriverEntry (
     //}
 
 	/* create simply buffer */
-	init_config();
+	// init_config();  // TODO: Remover, era do config.c antigo inicialziava spin lock
 	if (bfr_create() == 0) {
 		debug("Buffer created.");
 	}

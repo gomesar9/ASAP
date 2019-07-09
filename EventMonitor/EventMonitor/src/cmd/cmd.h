@@ -1,3 +1,5 @@
+#pragma once
+
 #define MAX_CMD_OPT_STR_LEN 64
 
 /* Enums */
@@ -33,5 +35,5 @@ typedef struct st_EM_CMD {
 	EM_CMDTYPE Type;
 	EM_SUBTYPE Subtype;
 	INT Opt1, Opt2;
-	CHAR[MAX_CMD_OPT_STR_LEN] Opt_str;
+	CHAR Opt_str[MAX_CMD_OPT_STR_LEN];
 }TEM_CMD, *PTEM_CMD;

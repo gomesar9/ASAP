@@ -36,7 +36,7 @@ VOID initialize_em() {
 	// TODO: Enable only setted in config.h by "ENABLE_CORE[0-3]" definition
 	for (UINT32 i=0; i < MAX_CORE_QTD; i++) {
 		TEM_CCFG ccfg;
-		*CCFG[i] = ccfg;
+		CCFG[i] = &ccfg;
 		CCFG[i]->Th_main = NULL;
 		CCFG[i]->Th_collector = NULL;
 		CCFG[i]->Core = i;
@@ -274,9 +274,7 @@ NTSTATUS em_stop(_In_ UINT32 core) {
 
 
 NTSTATUS execute(_In_ PTEM_CMD emCmd) {
-	NTSTATUS st = STATUS_SUCCESS;
 	NTSTATUS CHANGE_ME = STATUS_FAIL_CHECK;
-	CHAR dbgMsg[128];
 
 	for (UINT32 core = 0; core < CORE_QTD; core++)
 	{
@@ -285,16 +283,16 @@ NTSTATUS execute(_In_ PTEM_CMD emCmd) {
 		}
 
 		if (emCmd->Type == EM_CMD_CFG) {
-			em_configure(emCmd, CCFG[core]);
+			return em_configure(emCmd, CCFG[core]);
 
 		} else if (emCmd->Type == EM_CMD_START) {
-			em_start(CCFG[core]);
+			return em_start(CCFG[core]);
 
 		} else if (emCmd->Type == EM_CMD_STOP) {
-			em_stop(CCFG[core]->Core);
+			return em_stop(CCFG[core]->Core);
 		}
 	}
-	return st;
+	return CHANGE_ME;
 }
 
 /********************************************

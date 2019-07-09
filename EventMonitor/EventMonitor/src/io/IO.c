@@ -22,7 +22,7 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	UINT32 datasize, sizerequired= 0;
 
 	// --+-- EMC use --+--
-	CHAR _cmdBfr[MAX_USER_INPUT_LEN + 1];
+	CHAR _cmdBfr[MAX_USER_INPUT_LEN];
 	memset(_cmdBfr, '\0', EMS_BUFFER_MAX_LENGHT * sizeof(char));  // For sure..
 	
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
@@ -39,7 +39,7 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 		debug(msg);
 
 		//NtStatus = execute(_cmdBfr, (UINT16) datasize);  // TODO: Call validation function
-		NtStatus = validate_input(&_cmdBfr, datasize);
+		NtStatus = validate_input(_cmdBfr, datasize);
 
 		
 		Irp->IoStatus.Status = NtStatus;

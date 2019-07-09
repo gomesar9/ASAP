@@ -16,7 +16,7 @@ BOOLEAN checkFlag(UINT32 flag, UINT32 core) {
 	UINT32 _flags;
 
 	ExAcquireSpinLock(&(CCFG[core]->Lock_flags), &tmp);
-	_flags = CCFG[core]->Flags && flag
+	_flags = CCFG[core]->Flags && flag;
 	KeReleaseSpinLock(&(CCFG[core]->Lock_flags), tmp);
 
 	if (_flags == flag) {
