@@ -58,5 +58,5 @@ typedef struct st_EM_CCFG {
                Lock_flags;
 }TEM_CCFG, *PTEM_CCFG;
 
-// Sorry
-PTEM_CCFG CCFG[MAX_CORE_QTD];
+// Global Core Configurations
+TEM_CCFG CCFG[MAX_CORE_QTD];

@@ -1,7 +1,7 @@
 #pragma once
 #include "../config.h"
 
-#define BFR_SIZE 64
+#define BFR_SIZE 128
 #define IO_MAX_OUT_BUFFER SAMPLE_MAX * (12 + 1)
 
 int bfr_create();

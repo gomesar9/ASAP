@@ -40,7 +40,6 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 		//NtStatus = execute(_cmdBfr, (UINT16) datasize);  // TODO: Call validation function
 		NtStatus = validate_input(_cmdBfr, datasize);
-
 		
 		Irp->IoStatus.Status = NtStatus;
 	} else {

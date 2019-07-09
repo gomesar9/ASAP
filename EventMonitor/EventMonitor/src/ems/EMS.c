@@ -23,31 +23,30 @@ LARGE_INTEGER CFG_COLLECT_MILLI;		// Collector sleep time
 
 
 UINT32 get_cfg_collect_max(UINT32 core) {
-	return CCFG[core]->Collector_max;
+	return CCFG[core].Collector_max;
 }
 
 
 LARGE_INTEGER get_cfg_collector_millis(UINT32 core) {
-	return CCFG[core]->Collector_millis;
+	return CCFG[core].Collector_millis;
 }
 
 
 VOID initialize_em() {
 	// TODO: Enable only setted in config.h by "ENABLE_CORE[0-3]" definition
 	for (UINT32 i=0; i < MAX_CORE_QTD; i++) {
-		TEM_CCFG ccfg;
-		CCFG[i] = &ccfg;
-		CCFG[i]->Th_main = NULL;
-		CCFG[i]->Th_collector = NULL;
-		CCFG[i]->Core = i;
-		CCFG[i]->Interrupts = 0;
-		CCFG[i]->Collector_max = 0;
-		CCFG[i]->Threshold = 0;
-		CCFG[i]->Event_map.Event = _PE_INVALID_EVENT;
-		CCFG[i]->Event_map.Code = CFG_INVALID_EVENT_CODE;
-		CCFG[i]->Collector_millis.QuadPart = 10;
-		KeInitializeSpinLock(&(CCFG[i]->Lock_interrupts));
-		KeInitializeSpinLock(&(CCFG[i]->Lock_flags));
+		CCFG[i].Th_main = NULL;
+		CCFG[i].Th_collector = NULL;
+		CCFG[i].Core = i;
+		CCFG[i].Interrupts = 0;
+		CCFG[i].Flags = 0;
+		CCFG[i].Collector_max = 0;
+		CCFG[i].Threshold = 0;
+		CCFG[i].Event_map.Event = _PE_INVALID_EVENT;
+		CCFG[i].Event_map.Code = CFG_INVALID_EVENT_CODE;
+		CCFG[i].Collector_millis.QuadPart = 10;
+		KeInitializeSpinLock(&(CCFG[i].Lock_interrupts));
+		KeInitializeSpinLock(&(CCFG[i].Lock_flags));
 	}
 }
 
@@ -60,10 +59,10 @@ BOOLEAN get_interrupts(_Out_ PUINT32 collect, UINT32 core) {
 		return FALSE;
 	}
 			
-	ExAcquireSpinLock(&(CCFG[core]->Lock_interrupts), &old);
-	*collect = CCFG[core]->Interrupts;
-	CCFG[core]->Interrupts = 0;
-	KeReleaseSpinLock(&(CCFG[core]->Lock_interrupts), old);
+	ExAcquireSpinLock(&(CCFG[core].Lock_interrupts), &old);
+	*collect = CCFG[core].Interrupts;
+	CCFG[core].Interrupts = 0;
+	KeReleaseSpinLock(&(CCFG[core].Lock_interrupts), old);
 	return TRUE;
 }
 
@@ -102,7 +101,7 @@ void to_buffer(int info){
 
 NTSTATUS stop_pebs(_In_ INT core) {
 	NTSTATUS st;
-	st = PsCreateSystemThread(&(CCFG[core]->Th_main), GENERIC_ALL, NULL, NULL, NULL, StopperThread, (VOID*)core);
+	st = PsCreateSystemThread(&(CCFG[core].Th_main), GENERIC_ALL, NULL, NULL, NULL, StopperThread, (VOID*)core);
 	
 	clearFlag(F_EM_PEBS_ACTIVE, core);
 
@@ -111,7 +110,7 @@ NTSTATUS stop_pebs(_In_ INT core) {
 		unhook_handler(core);
 	}
 	
-	CCFG[core]->Interrupts = 0;
+	CCFG[core].Interrupts = 0;
 
 	return STATUS_SUCCESS;
 }
@@ -124,7 +123,8 @@ NTSTATUS em_configure(_In_ PTEM_CMD emCmd, _Out_ PTEM_CCFG cfg) {
 	UINT32 core = cfg->Core;
 
 #if EMS_DEBUG > 0 //--------------------
-	debug("[EXC] EM_CFG detected.");
+	sprintf(dbgMsg, "[EXC] EM_CFG detected on core %d.", core);
+	debug(dbgMsg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 	if (checkFlag(F_EM_PEBS_ACTIVE, cfg->Core)) {
@@ -145,8 +145,11 @@ NTSTATUS em_configure(_In_ PTEM_CMD emCmd, _Out_ PTEM_CCFG cfg) {
 		if (!getPEBSEvt( &(cfg->Event_map) )) {
 			return CHANGE_ME;
 		}
-
+		sprintf(dbgMsg, "Flags: %u.", CCFG[core].Flags);
+		debug(dbgMsg);
 		setFlag(F_EM_EVENT, core);
+		sprintf(dbgMsg, "Flags: %u.", CCFG[core].Flags);
+		debug(dbgMsg);
 		break;
 
 	// #########################################################################
@@ -157,7 +160,7 @@ NTSTATUS em_configure(_In_ PTEM_CMD emCmd, _Out_ PTEM_CCFG cfg) {
 		debug(dbgMsg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-		CCFG[core]->Collector_max = emCmd->Opt1;
+		CCFG[core].Collector_max = emCmd->Opt1;
 
 		setFlag(F_EM_COLLECT_MAX, core);
 		break;
@@ -195,7 +198,7 @@ NTSTATUS em_configure(_In_ PTEM_CMD emCmd, _Out_ PTEM_CCFG cfg) {
 		return CHANGE_ME;
 	}
 
-	to_buffer(I_CGF_SET);
+	//to_buffer(I_CGF_SET);
 	return st;
 }
 
@@ -278,18 +281,18 @@ NTSTATUS execute(_In_ PTEM_CMD emCmd) {
 
 	for (UINT32 core = 0; core < CORE_QTD; core++)
 	{
-		if (!emCmd->Cores && 1u << core) {
+		if (!(emCmd->Cores && (1u << core))) {
 			continue;
 		}
 
 		if (emCmd->Type == EM_CMD_CFG) {
-			return em_configure(emCmd, CCFG[core]);
+			return em_configure(emCmd, &(CCFG[core]));
 
 		} else if (emCmd->Type == EM_CMD_START) {
-			return em_start(CCFG[core]);
+			return em_start(&(CCFG[core]));
 
 		} else if (emCmd->Type == EM_CMD_STOP) {
-			return em_stop(CCFG[core]->Core);
+			return em_stop(core);
 		}
 	}
 	return CHANGE_ME;
@@ -334,7 +337,7 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	UINT64 pmc0, perf_ctr0, perf_global_status;
 	PTDS_BASE tmp;
 
-	sprintf(_msg, "----- [PMI] %d -----", CCFG[core]->Interrupts);
+	sprintf(_msg, "----- [PMI] %d -----", CCFG[core].Interrupts);
 	debug(_msg);
 
 	sprintf(_msg, "[PMI]IA32_PERF_GLOBAL_ST: %lld", DS_BASE->PEBS_BUFFER_BASE->IA32_PERF_GLOBAL_ST);
@@ -348,14 +351,14 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 
 	// Increment interrupt counter
 	KIRQL old;
-	ExAcquireSpinLock(&(CCFG[core]->Lock_interrupts), &old);
-	CCFG[core]->Interrupts++;
-	KeReleaseSpinLock(&(CCFG[core]->Lock_interrupts), old);
+	ExAcquireSpinLock(&(CCFG[core].Lock_interrupts), &old);
+	CCFG[core].Interrupts++;
+	KeReleaseSpinLock(&(CCFG[core].Lock_interrupts), old);
 
 	//bfr_tick();			// IO data
 
 	// Re-enable PEBS
-	if (CCFG[core]->Interrupts < EM_SAFE_INTERRUPT_LIMIT) {
+	if (CCFG[core].Interrupts < EM_SAFE_INTERRUPT_LIMIT) {
 		//DS_BASE->PEBS_BUFFER_BASE = PEBS_BUFFER;	// Theoretically not necessary
 
 #ifdef DEBUG_DEV //--------------------------------------------------------------------
@@ -526,7 +529,7 @@ VOID StarterThread(_In_ PVOID StartContext) {
 
 	// Allocate structs and buffers
 	DS_BASE = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), 'DSB');
-	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CCFG[core]->Collector_max * sizeof(TPEBS_BUFFER), 'PBF');
+	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CCFG[core].Collector_max * sizeof(TPEBS_BUFFER), 'PBF');
 
 
 	fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
