@@ -1,8 +1,76 @@
 #pragma once
 
+/* Can be configured */
+#define NEHALEM_NEW_FIELDS 1
+
+/* Constants */
+#define DISABLE_PEBS 0
+#define ENABLE_PEBS 1
+
+#define EVTSEL_EN 1<<22
+#define EVTSEL_USR 1<<16
+#define EVTSEL_INT 1<<20
+
+#define MSR_IA32_PERFCTR0			0xC1
+#define MSR_IA32_EVNTSEL0			0x186
+#define MSR_IA32_GLOBAL_CTRL		0x38F
+#define MSR_IA32_GLOAL_STATUS		0x38E
+#define MSR_IA32_GLOBAL_OVF_CTRL	0x390
+#define MSR_IA32_PEBS_ENABLE		0x3F1
+
+#define ORIGINAL_APIC_VALUE			254
+
+#define PERF_COUNTER_APIC			0xFEE00340
+
+#define MSR_DS_AREA 0x600	// 1536
+
+#define TAG_PREFIX_DS_BASE 1u << 10;
+#define TAG_PREFIX_PEBS_BUFFER 1u << 11;
+
+
+typedef struct st_BTSBUFFER {
+	UINT64 FROM, TO, MISC;
+}TBTS_BUFFER, *PTBTS_BUFFER;
+
+// PEBS struct
+typedef struct st_PEBSBUFFER {
+	UINT64
+		RFLAGS, RIP, RAX, RBX, RCX,
+		RDX, RSI, RDI, RBP, RSP,
+		R8, R9, R10, R11, R12, R13, R14, R15,
+		IA32_PERF_GLOBAL_ST, DATA_LINEAR_ADDR,
+		DATA_SOURCE_ENCODING, LATENCY_VALUE;
+}TPEBS_BUFFER, *PTPEBS_BUFFER;
+
+typedef struct st_DSBASE {
+	// Pointers to BTS struct
+	PTBTS_BUFFER
+		BTS_BUFFER_BASE,
+		BTS_INDEX,
+		BTS_MAXIMUM,
+		BTS_THRESHOLD;
+
+	// Pointers to PEBS struct
+	PTPEBS_BUFFER
+		PEBS_BUFFER_BASE,
+		PEBS_INDEX,
+		PEBS_MAXIMUM,
+		PEBS_THRESHOLD;
+	UINT64 PEBS_CTR0_RST;
+#ifdef NEHALEM_NEW_FIELDS
+	UINT64
+		PEBS_CTR1_RST,
+		PEBS_CTR2_RST,
+		PEBS_CTR3_RST;
+#endif
+}TDS_BASE, *PTDS_BASE;
+
+/*
+########################################################
+### PART II - EVENTS
+*/
 #define _NUM_EVENTS 45
 #define CFG_INVALID_EVENT_CODE 0
-
 
 typedef enum EPEBS_EVENTS {
 	_PE_INVALID_EVENT	= 0x0,

@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include "dbg/debug.h"
 #include "stdlib.h" // Needed for atoi()
-#include "ems/events.h"
+#include "ems/hpc.h"
 
 
 //#define DEBUG_DEV 1		// Define if development prints are enabled (To find some specific behavior)
@@ -56,6 +56,8 @@ typedef struct st_EM_CCFG {
     LARGE_INTEGER Collector_millis;
     KSPIN_LOCK Lock_interrupts,
                Lock_flags;
+    PTDS_BASE DS_base;
+    PTPEBS_BUFFER PEBS_buffer;
 }TEM_CCFG, *PTEM_CCFG;
 
 // Global Core Configurations
