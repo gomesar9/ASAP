@@ -10,9 +10,9 @@ UINT32 check_cores_actives() {
 	CHAR dbgmsg[128];
 
 	for (UINT32 core=0; core < CORE_QTD; core++) {
+		sprintf(dbgmsg, "[Core %d]: (Flags) %d AND %d (Active).", core, CCFG[core].Flags, F_EM_PEBS_ACTIVE);
+		debug(dbgmsg);
 		if (checkFlag(F_EM_PEBS_ACTIVE, core)) {
-			sprintf(dbgmsg, "[Core %d]: (Flags) %d AND %d (Active).", core, CCFG[core].Flags, F_EM_PEBS_ACTIVE);
-			debug(dbgmsg);
 			actives |= 1u << core;
 		}
 	}

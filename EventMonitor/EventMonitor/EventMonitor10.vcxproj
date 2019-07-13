@@ -76,7 +76,7 @@
     <ClInclude Include="src\dbg\debug.h" />
     <ClInclude Include="src\dvc\device.h" />
     <ClInclude Include="src\ems\EMS.h" />
-    <ClInclude Include="src\ems\events.h" />
+    <ClInclude Include="src\ems\hpc.h" />
     <ClInclude Include="src\ems\lockers.h" />
     <ClInclude Include="src\io\IO.h" />
     <ClInclude Include="src\vld\validator.h" />

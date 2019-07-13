@@ -15,9 +15,6 @@
  Variables
  */
 
-PTDS_BASE DS_BASE;						// PEBS Base
-PTPEBS_BUFFER PEBS_BUFFER;				// PEBS Buffer
-
 
 UINT32 get_cfg_collect_max(UINT32 core) {
 	return CCFG[core].Collector_max;
@@ -353,9 +350,6 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	CCFG[core].Interrupts++;
 	KeReleaseSpinLock(&(CCFG[core].Lock_interrupts), old);
 
-	char _msg[128];
-	sprintf(_msg, "--- PMI --- [Core %d]", core);
-	debug(_msg);
 	//bfr_tick();			// IO data
 
 	// Re-enable PEBS
@@ -488,32 +482,33 @@ VOID thread_attach_to_core(uintptr_t id) {
 	KeSetSystemAffinityThread(mask);
 }
 
-VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer) {
-	ds_base->PEBS_BUFFER_BASE = pebs_buffer;
-	ds_base->PEBS_INDEX = pebs_buffer;
+VOID fill_ds_with_buffer(PTEM_CCFG cfg) {
+
+	cfg->DS_base->PEBS_BUFFER_BASE = cfg->PEBS_buffer;
+	cfg->DS_base->PEBS_INDEX = cfg->PEBS_buffer;
 #ifdef DEBUG_DEV
-	ds_base->PEBS_MAXIMUM = pebs_buffer + MAX_INTERRUPTS;
-	ds_base->PEBS_THRESHOLD = pebs_buffer + 2; // TODO: adjust
+	cfg->DS_base->PEBS_MAXIMUM = cfg->PEBS_buffer + MAX_INTERRUPTS;
+	cfg->DS_base->PEBS_THRESHOLD = cfg->PEBS_buffer + 2; // TODO: adjust
 #else
-	ds_base->PEBS_MAXIMUM = pebs_buffer + 1;
-	ds_base->PEBS_THRESHOLD = pebs_buffer;	// Inactive, I think..
+	cfg->DS_base->PEBS_MAXIMUM = cfg->PEBS_buffer + 1;
+	cfg->DS_base->PEBS_THRESHOLD = cfg->PEBS_buffer;	// Inactive, I think..
 #endif
-	ds_base->PEBS_CTR0_RST = CCFG[0].Threshold;  // TODO: Make multi-core friendly
+	cfg->DS_base->PEBS_CTR0_RST = cfg->Threshold;  // TODO: Make multi-core friendly
 #ifdef NEHALEM_NEW_FIELDS
-	ds_base->PEBS_CTR1_RST = CCFG[0].Threshold;
-	ds_base->PEBS_CTR2_RST = CCFG[0].Threshold;
-	ds_base->PEBS_CTR3_RST = CCFG[0].Threshold;
+	cfg->DS_base->PEBS_CTR1_RST = cfg->Threshold;
+	cfg->DS_base->PEBS_CTR2_RST = cfg->Threshold;
+	cfg->DS_base->PEBS_CTR3_RST = cfg->Threshold;
 #endif
 
 #ifdef DEBUG_DEV
 	char _msg[128];
 	sprintf(_msg, "SIZEOF TPEBS_BUFFER: %Id", sizeof(TPEBS_BUFFER));
 	debug(_msg);
-	sprintf(_msg, "DS_BASE  : %p", DS_BASE->PEBS_BUFFER_BASE);
+	sprintf(_msg, "DS_BASE  : %p", cfg->DS_base->PEBS_BUFFER_BASE);
 	debug(_msg);
-	sprintf(_msg, "PEBS_TRHD: %p", ds_base->PEBS_THRESHOLD);
+	sprintf(_msg, "PEBS_TRHD: %p", cfg->DS_base->PEBS_THRESHOLD);
 	debug(_msg);
-	sprintf(_msg, "PEBS_CTR0_RST: %llx", ds_base->PEBS_CTR0_RST);
+	sprintf(_msg, "PEBS_CTR0_RST: %llx", cfg->DS_base->PEBS_CTR0_RST);
 	debug(_msg);
 #endif
 }
@@ -529,11 +524,13 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	thread_attach_to_core(core);
 
 	// Allocate structs and buffers
-	DS_BASE = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), 'DSB');
-	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CCFG[core].Collector_max * sizeof(TPEBS_BUFFER), 'PBF');
+	ULONG tagds = TAG_PREFIX_DS_BASE & core;
+	ULONG tagbuffer = TAG_PREFIX_PEBS_BUFFER & core;
 
+	CCFG[core].DS_base = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), tagds);
+	CCFG[core].PEBS_buffer = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CCFG[core].Collector_max * sizeof(TPEBS_BUFFER), tagbuffer);
 
-	fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
+	fill_ds_with_buffer(&(CCFG[core]));
 	
 	pa.QuadPart = PERF_COUNTER_APIC;
 	/*
@@ -547,7 +544,7 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	*APIC = ORIGINAL_APIC_VALUE;
 	MmUnmapIoSpace(APIC, sizeof(UINT32));
 
-	__writemsr(MSR_DS_AREA, (UINT_PTR)DS_BASE);
+	__writemsr(MSR_DS_AREA, (UINT_PTR)CCFG[core].DS_base);
 
 	// --+-- Enable mechanism --+--
 	// Disable PEBS to set up
@@ -593,8 +590,11 @@ VOID StopperThread(_In_ PVOID StartContext) {
 	__writemsr(MSR_IA32_GLOBAL_CTRL, DISABLE_PEBS);
 
 	// Free allocated memory
-	ExFreePoolWithTag(PEBS_BUFFER, 'PBF'); // Buffer
-	ExFreePoolWithTag(DS_BASE, 'DSB');	// Struct
+	ULONG tagds = TAG_PREFIX_DS_BASE & core;
+	ULONG tagbuffer = TAG_PREFIX_PEBS_BUFFER & core;
+	
+	ExFreePoolWithTag(CCFG[core].PEBS_buffer, tagds);  // Buffer
+	ExFreePoolWithTag(CCFG[core].DS_base, tagbuffer);  // Struct
 
 #if EMS_DEBUG >= 0 //------------------------------------------------------------------
 	CHAR dbgMsg[128];

@@ -40,7 +40,7 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext);
 VOID hook_handler(UINT32 core);
 VOID unhook_handler(UINT32 core);
 VOID thread_attach_to_core(uintptr_t id);
-VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer);
+VOID fill_ds_with_buffer(PTEM_CCFG cfg);
 VOID StarterThread(_In_ PVOID StartContext);
 VOID StopperThread(_In_ PVOID StartContext);
 BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap);
