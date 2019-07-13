@@ -272,7 +272,7 @@ NTSTATUS em_stop(_In_ UINT32 core) {
 
 
 NTSTATUS execute(_In_ PTEM_CMD emCmd) {
-	NTSTATUS CHANGE_ME = STATUS_FAIL_CHECK;
+	NTSTATUS st = STATUS_FAIL_CHECK;;
 
 	for (UINT32 core = 0; core < CORE_QTD; core++)
 	{
@@ -281,16 +281,21 @@ NTSTATUS execute(_In_ PTEM_CMD emCmd) {
 		}
 
 		if (emCmd->Type == EM_CMD_CFG) {
-			return em_configure(emCmd, &(CCFG[core]));
+			st = em_configure(emCmd, &(CCFG[core]));
 
 		} else if (emCmd->Type == EM_CMD_START) {
-			return em_start(&(CCFG[core]));
+			st = em_start(&(CCFG[core]));
 
 		} else if (emCmd->Type == EM_CMD_STOP) {
-			return em_stop(core);
+			st = em_stop(core);
+		}
+
+		if (st != STATUS_SUCCESS) {
+			debug("Error while executing commands.");
+			return st;
 		}
 	}
-	return CHANGE_ME;
+	return st;
 }
 
 /********************************************

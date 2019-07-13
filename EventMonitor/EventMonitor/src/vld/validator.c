@@ -99,8 +99,7 @@ NTSTATUS validate_input(_In_ CHAR userinput[MAX_USER_INPUT_LEN], _In_ UINT32 dat
 		// All setted cores must be actives
 		if (target_actives == emCmd.Cores) {
 			return execute(&emCmd);
-		}
-		else {
+		} else {
 			// Return one or more cores are not running
 			return CHANGE_ME;
 		}

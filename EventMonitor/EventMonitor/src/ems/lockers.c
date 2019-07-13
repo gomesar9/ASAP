@@ -31,6 +31,6 @@ VOID clearFlag(UINT32 flag, UINT32 core) {
 	KIRQL tmp;
 
 	ExAcquireSpinLock(&(CCFG[core].Lock_flags), &tmp);
-	CCFG[core].Flags = ~flag;
+	CCFG[core].Flags &= ~flag;
 	KeReleaseSpinLock(&(CCFG[core].Lock_flags), tmp);
 }
