@@ -229,7 +229,7 @@ NTSTATUS em_start(_In_ PTEM_CCFG cfg) {
 		GENERIC_ALL,
 		NULL, NULL, NULL,
 		StarterThread,
-		(VOID*)core
+		(VOID*)cfg->Core
 	);
 
 	if (NT_SUCCESS(st)) {
@@ -240,7 +240,7 @@ NTSTATUS em_start(_In_ PTEM_CCFG cfg) {
 			GENERIC_ALL,
 			NULL, NULL, NULL,
 			start_collector,
-			&core
+			&(cfg->Core)
 		);
 
 		if (!NT_SUCCESS(st)) {
@@ -431,10 +431,6 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 
 }
 
-// Hook Handles
-TFUNC_POINTER perfmon_hook;
-PVOID restore_hook = NULL;
-
 /*
 	Install PMI
 */
@@ -447,12 +443,12 @@ VOID hook_handler(UINT32 core) {
 		_Out_	PVOID						Buffer
 	);
 	*/
-	perfmon_hook.Function = PMI;
-
+	CCFG[core].Perfmon_hook.Function = PMI;
+	
 	st = HalSetSystemInformation(
 		HalProfileSourceInterruptHandler,
 		sizeof(PVOID*),
-		&perfmon_hook.Pointer
+		&(CCFG[core].Perfmon_hook.Pointer)
 	);
 
 	//char msg[126];
@@ -469,7 +465,7 @@ VOID unhook_handler(UINT32 core) {
 	st = HalSetSystemInformation(
 		HalProfileSourceInterruptHandler,
 		sizeof(PVOID*),
-		&restore_hook
+		&(CCFG[core].Restore_hook)
 	);
 	clearFlag(F_EM_HOOK_INSTALLED, core);
 }
@@ -529,8 +525,8 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	thread_attach_to_core(core);
 
 	// Allocate structs and buffers
-	ULONG tagds = TAG_PREFIX_DS_BASE & core;
-	ULONG tagbuffer = TAG_PREFIX_PEBS_BUFFER & core;
+	ULONG tagds = TAG_PREFIX_DS_BASE | (ULONG) core;
+	ULONG tagbuffer = TAG_PREFIX_PEBS_BUFFER | (ULONG) core;
 
 	CCFG[core].DS_base = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), tagds);
 	CCFG[core].PEBS_buffer = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CCFG[core].Collector_max * sizeof(TPEBS_BUFFER), tagbuffer);
@@ -595,8 +591,8 @@ VOID StopperThread(_In_ PVOID StartContext) {
 	__writemsr(MSR_IA32_GLOBAL_CTRL, DISABLE_PEBS);
 
 	// Free allocated memory
-	ULONG tagds = TAG_PREFIX_DS_BASE & core;
-	ULONG tagbuffer = TAG_PREFIX_PEBS_BUFFER & core;
+	ULONG tagds = TAG_PREFIX_DS_BASE | (ULONG) core;
+	ULONG tagbuffer = TAG_PREFIX_PEBS_BUFFER | (ULONG) core;
 	
 	ExFreePoolWithTag(CCFG[core].PEBS_buffer, tagds);  // Buffer
 	ExFreePoolWithTag(CCFG[core].DS_base, tagbuffer);  // Struct

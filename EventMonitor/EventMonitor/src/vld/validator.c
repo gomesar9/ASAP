@@ -10,7 +10,7 @@ UINT32 check_cores_actives() {
 	CHAR dbgmsg[128];
 
 	for (UINT32 core=0; core < CORE_QTD; core++) {
-		sprintf(dbgmsg, "[Core %d]: (Flags) %d AND %d (Active).", core, CCFG[core].Flags, F_EM_PEBS_ACTIVE);
+		sprintf(dbgmsg, "[VLD] Core %d: Flags: %d AND %d.", core, CCFG[core].Flags, F_EM_PEBS_ACTIVE);
 		debug(dbgmsg);
 		if (checkFlag(F_EM_PEBS_ACTIVE, core)) {
 			actives |= 1u << core;
@@ -24,31 +24,41 @@ NTSTATUS validate_input(_In_ CHAR userinput[MAX_USER_INPUT_LEN], _In_ UINT32 dat
 	NTSTATUS CHANGE_ME = STATUS_FAIL_CHECK;
 	TEM_CMD emCmd;
 	CHAR chunk[2];
+#if VLD_DEBUG > 0 //------------------------------------------------------------
 	CHAR dbgmsg[128];
+#endif
 
 	// Split input
 	strncpy(chunk, &(userinput[0]), 2);
 	emCmd.Cores = (UINT32) atoi(chunk);
+#if VLD_DEBUG > 0 //------------------------------------------------------------
 	sprintf(chunk, "\0\0");
-	sprintf(dbgmsg, "[Cores]: %d.", emCmd.Cores);
+	sprintf(dbgmsg, "[VLD] Cores: %d.", emCmd.Cores);
 	debug(dbgmsg);
+#endif
 
 	strncpy(chunk, &(userinput[2]), 2);
 	emCmd.Type = atoi(chunk);
+#if VLD_DEBUG > 0 //------------------------------------------------------------
 	sprintf(chunk, "\0\0");
-	sprintf(dbgmsg, "[Type]: %d.", emCmd.Type);
+	sprintf(dbgmsg, "[VLD] Type: %d.", emCmd.Type);
 	debug(dbgmsg);
+#endif
 
 	strncpy(chunk, &(userinput[4]), 2);
 	emCmd.Subtype = atoi(chunk);
+#if VLD_DEBUG > 0 //------------------------------------------------------------
 	sprintf(chunk, "\0\0");
-	sprintf(dbgmsg, "[Subtype]: %d.", emCmd.Subtype);
+	sprintf(dbgmsg, "[VLD] Subtype: %d.", emCmd.Subtype);
 	debug(dbgmsg);
+#endif
 
 	UINT32 actives = check_cores_actives(emCmd.Cores);
 	UINT32 target_actives = emCmd.Cores & actives;
-	sprintf(dbgmsg, "[Target_actives]: %u.", target_actives);
+#if VLD_DEBUG > 0 //------------------------------------------------------------
+	sprintf(dbgmsg, "[VLD] Target_actives: %ud.", target_actives);
 	debug(dbgmsg);
+#endif
 
 	UINT32 none = 0;
 	// Start CMD ###############################################################
@@ -68,8 +78,10 @@ NTSTATUS validate_input(_In_ CHAR userinput[MAX_USER_INPUT_LEN], _In_ UINT32 dat
 	if (emCmd.Type == EM_CMD_CFG) {
 		if (target_actives > 0) {
 			// Report one or more cores cannot be configured because are running
-			sprintf(dbgmsg, "[CFG]: Core(s) active(s). %u", actives);
+#if VLD_DEBUG > 0 //------------------------------------------------------------
+			sprintf(dbgmsg, "[VLD]: Core(s) active(s). %u", actives);
 			debug(dbgmsg);
+#endif
 			return CHANGE_ME;
 		}
 		UINT32 idxcmd = 0;
@@ -82,10 +94,10 @@ NTSTATUS validate_input(_In_ CHAR userinput[MAX_USER_INPUT_LEN], _In_ UINT32 dat
 		_bff[idxcmd] = '\0'; // Assurance
 		if (idxcmd > 0) {
 			emCmd.Opt1 = atoi(_bff);
-#if 1 //-------------------------------------------------------------
-			sprintf(dbgmsg, "[UPK]: %d.", emCmd.Opt1);
+#if VLD_DEBUG > 0 //------------------------------------------------------------
+			sprintf(dbgmsg, "[VLD] Opt1: %d.", emCmd.Opt1);
 			debug(dbgmsg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#endif
 			return execute(&emCmd);
 		}
 		else {

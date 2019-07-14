@@ -24,8 +24,8 @@
 
 #define MSR_DS_AREA 0x600	// 1536
 
-#define TAG_PREFIX_DS_BASE 1u << 10;
-#define TAG_PREFIX_PEBS_BUFFER 1u << 11;
+#define TAG_PREFIX_DS_BASE 1u << 10
+#define TAG_PREFIX_PEBS_BUFFER 1u << 11
 
 
 typedef struct st_BTSBUFFER {

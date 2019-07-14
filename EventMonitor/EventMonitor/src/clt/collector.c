@@ -26,12 +26,17 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 	CHAR _msg[128];
 	sprintf(_msg, "[CLT] Core: %u. ITR: %u.", core, _cfg_collect_max);
 	debug(_msg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#endif
 	//while (accumulator < _cfg_interrupt) {
 	while (_collect_count < _cfg_collect_max) {
 		// Collect data
-		if (get_interrupts(&DATA[counter], core) == FALSE) {
-			debug("[CLT] Stopped from command.");
+		if (get_interrupts(&(DATA[counter]), core) == FALSE) {
+#if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
+			sprintf(_msg, "[CLT] Core %d Stopped from command.", core);
+			debug(_msg);
+			sprintf(_msg, "[CLT] (%d) Flags: %d", core, CCFG[core].Flags);
+			debug(_msg);
+#endif
 			return STATUS_SUCCESS;
 		}
 		//accumulator += DATA[counter++];
@@ -40,14 +45,14 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 #if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
 		sprintf(_msg, "[CLT] [%d]: %u..", counter, DATA[counter-1]);
 		debug(_msg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#endif
 
 		// Put into buffer
 		if (counter >= SAMPLE_MAX) {
 #if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
 			sprintf( _msg, "[CLT] %u, %u, %u, ...", DATA[0], DATA[1], DATA[2] );
 			debug(_msg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#endif
 			bfr_tick(DATA, counter, core);
 			counter = 0;
 		}
@@ -66,7 +71,7 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 #if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
 		sprintf(_msg, "[CLT](L) %u, %u, %u, ...", DATA[0], DATA[1], DATA[2]);
 		debug(_msg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#endif
 		bfr_tick(DATA, counter, core);
 		counter = 0;
 	}

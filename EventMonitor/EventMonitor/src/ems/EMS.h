@@ -18,10 +18,7 @@
 	#define _PERIOD 0xFFFFull	// Easy to verify. Not used since V0.3
 #endif
 
-typedef union st_TRICK {
-	PVOID Pointer;
-	VOID(*Function) (__in struct _KINTERRUPT *, __in PVOID);
-} TFUNC_POINTER, *PTFUNC_POINTER;
+
 
 /*
 Functions
