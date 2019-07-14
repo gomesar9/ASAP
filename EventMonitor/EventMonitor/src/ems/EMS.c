@@ -1,66 +1,67 @@
 #include "EMS.h"
+#include "lockers.h"
+#include "../config.h"
 #include "../bfr/buffer.h"
 #include "../clt/collector.h"
 
 /*
  * void __writemsr(
- *     unsigned long Register,
- *     unsigned __int64 Value
+ *	 unsigned long Register,
+ *	 unsigned __int64 Value
  * );
  */
 
  /*
  Variables
  */
-UINT32 INTERRUPTS[CORE_QTD];			// Interruptions count
-UINT32 CFG_COLLECT_MAX;					// Collection times
-TPEBS_EVT_MAP CFG_EVENT;				// PEBS Event Code
-UINT32 CFG_THRESHOLD;					// Events to trigger one interruption
-LARGE_INTEGER CFG_COLLECT_MILLI;		// Collector sleep time
-HANDLE thandle[CORE_QTD];				// Thread Handle to PEBS
-HANDLE thandleCollector[CORE_QTD];		// Thread handle to Collector
-PTDS_BASE DS_BASE;						// PEBS Base
-PTPEBS_BUFFER PEBS_BUFFER;				// PEBS Buffer
-KSPIN_LOCK LOCK_INTERRUPT[CORE_QTD];	// Spin Lock for INTERRUPTS
 
 
-UINT32 get_cfg_collect_max() {
-	return CFG_COLLECT_MAX;
+UINT32 get_cfg_collect_max(UINT32 core) {
+	return CCFG[core].Collector_max;
 }
 
 
-LARGE_INTEGER get_cfg_collector_millis() {
-	return CFG_COLLECT_MILLI;
+LARGE_INTEGER get_cfg_collector_millis(UINT32 core) {
+	return CCFG[core].Collector_millis;
 }
 
 
 VOID initialize_em() {
-	CFG_EVENT.Code = CFG_INVALID_EVENT_CODE;
-	CFG_EVENT.Event = _PE_INVALID_EVENT;
-	CFG_THRESHOLD = 0;
-	CFG_COLLECT_MAX = 0;
-	CFG_COLLECT_MILLI.QuadPart = 10;
-	for (size_t i = 0; i < CORE_QTD; i++) {
-		INTERRUPTS[i] = 0;
-		KeInitializeSpinLock(&LOCK_INTERRUPT[i]);
+	// TODO: Enable only setted in config.h by "ENABLE_CORE[0-3]" definition
+	for (UINT32 i=0; i < MAX_CORE_QTD; i++) {
+		CCFG[i].Th_main = NULL;
+		CCFG[i].Th_collector = NULL;
+		CCFG[i].Core = i;
+		CCFG[i].Interrupts = 0;
+		CCFG[i].Flags = 0;
+		CCFG[i].Collector_max = 0;
+		CCFG[i].Threshold = 0;
+		CCFG[i].Event_map.Event = _PE_INVALID_EVENT;
+		CCFG[i].Event_map.Code = CFG_INVALID_EVENT_CODE;
+		CCFG[i].Collector_millis.QuadPart = 10;
+		KeInitializeSpinLock(&(CCFG[i].Lock_interrupts));
+		KeInitializeSpinLock(&(CCFG[i].Lock_flags));
 	}
 }
 
 
 BOOLEAN get_interrupts(_Out_ PUINT32 collect, UINT32 core) {
-	if (checkFlag(F_EM_PEBS_ACTIVE)) {
-		KIRQL old;
-		ExAcquireSpinLock(&LOCK_INTERRUPT[core], &old);
-		*collect = INTERRUPTS[core];
-		INTERRUPTS[core] = 0;
-		KeReleaseSpinLock(&LOCK_INTERRUPT[core], old);
-		return TRUE;
-	} else {
+	KIRQL old;
+
+	// Check if core is NOT active
+	if (!checkFlag(F_EM_PEBS_ACTIVE, core)) {
 		return FALSE;
 	}
+			
+	ExAcquireSpinLock(&(CCFG[core].Lock_interrupts), &old);
+	*collect = CCFG[core].Interrupts;
+	CCFG[core].Interrupts = 0;
+	KeReleaseSpinLock(&(CCFG[core].Lock_interrupts), old);
+	return TRUE;
 }
 
-
+// TODO: Kick off?
+// Information status
 typedef enum _INFOS{
 	I_START,
 	I_ENABLE,
@@ -94,266 +95,206 @@ void to_buffer(int info){
 
 NTSTATUS stop_pebs(_In_ INT core) {
 	NTSTATUS st;
-	st = PsCreateSystemThread(&thandle[core], GENERIC_ALL, NULL, NULL, NULL, StopperThread, (VOID*)core);
-
-	clearFlag(F_EM_PEBS_ACTIVE);
-
-	// uninstall hook after stop Thread
-	unhook_handler();
+	st = PsCreateSystemThread(&(CCFG[core].Th_main), GENERIC_ALL, NULL, NULL, NULL, StopperThread, (VOID*)core);
 	
-	//INTERRUPTS = 0; // TODO: Make vector for multiple cores
+	clearFlag(F_EM_PEBS_ACTIVE, core);
+
+	// uninstall hook after stop Thread if there are no PEBS active.
+	// TODO: Check all cores
+	if (!checkFlag(F_EM_PEBS_ACTIVE, core) && checkFlag(F_EM_HOOK_INSTALLED, core)) {
+		unhook_handler(core);
+	}
+	
+	CCFG[core].Interrupts = 0;
 
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS _unpack(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _Out_ PTEM_CMD emCmd, _In_ UINT16 datasize) {
+
+NTSTATUS em_configure(_In_ PTEM_CMD emCmd, _Out_ PTEM_CCFG cfg) {
 	NTSTATUS st = STATUS_SUCCESS;
-	CHAR chunk[2];
-	INT num, state = 0;
+	NTSTATUS CHANGE_ME = STATUS_FAIL_CHECK;
+	CHAR dbgMsg[128];
+	UINT32 core = cfg->Core;
 
-	while ((state * 2) + 1 < EMS_CMD_MAX_LENGTH) {
-		strncpy(chunk, &(cmd[state * 2]), 2);
-		num = atoi(chunk);
+#if EMS_DEBUG > 0 //--------------------
+	sprintf(dbgMsg, "[EXC] EM_CFG detected on core %d.", core);
+	debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-		switch (state)
-		{
-		case 0:
-			emCmd->Type = num;
-			break;
-
-		case 1:
-			emCmd->Event = num;
-			break;
-
-		default:
-			break;
-		}
-		state++;
+	if (checkFlag(F_EM_PEBS_ACTIVE, cfg->Core)) {
+		debug("[!EXC] CANNOT change Event while PEBS active.");
+		return CHANGE_ME;
 	}
-	if (emCmd->Type == EM_CMD_CFG) {
-		int idx = 0;
-		char _bff[64];
-		state = EMS_CMD_MAX_LENGTH + 1; // Assurance.
 
-		while (cmd[state] != ' ' && state < datasize && idx < 63) {
-			_bff[idx++] = cmd[state++];
-		}
-		_bff[idx] = '\0'; // Assurance
-		if (idx > 0) {
-			emCmd->Opt1 = atoi(_bff);
-#ifdef DEBUG_DEV //--------------------------------------------------------------------
-			sprintf(_bff, "[UPK]: %d.", emCmd->Opt1);
-			debug(_bff);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-		}
-		else {
-			emCmd->Type = EM_CMD_NULL;
-			emCmd->Event = EM_EVT_NULL;
+	switch (emCmd->Subtype) {
+	// #########################################################################
+	// 0) Configure Event
+	case EM_CFG_EVT:
+#if EMS_DEBUG > 0 //--------------------
+		sprintf(dbgMsg, "[EXC] EM_CFG_EVT: %u.", emCmd->Opt1);
+		debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-			// TODO: Return better code error
-			return STATUS_MESSAGE_NOT_FOUND;
+		cfg->Event_map.Code = emCmd->Opt1;
+		if (!getPEBSEvt( &(cfg->Event_map) )) {
+			return CHANGE_ME;
+		}
+		sprintf(dbgMsg, "Flags: %u.", CCFG[core].Flags);
+		debug(dbgMsg);
+		setFlag(F_EM_EVENT, core);
+		sprintf(dbgMsg, "Flags: %u.", CCFG[core].Flags);
+		debug(dbgMsg);
+		break;
+
+	// #########################################################################
+	// 1) Configure Collect MAX
+    case EM_CFG_COLLECT_MAX:
+#if EMS_DEBUG > 0 //--------------------
+		sprintf(dbgMsg, "[EXC] EM_CFG_COLLECT_MAX: %u.", emCmd->Opt1);
+		debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+		CCFG[core].Collector_max = emCmd->Opt1;
+
+		setFlag(F_EM_COLLECT_MAX, core);
+		break;
+
+	// #########################################################################
+	// 2) Configure Threshold
+	case EM_CFG_THRESHOLD:
+#if EMS_DEBUG > 0 //--------------------
+		sprintf(dbgMsg, "[EXC] EM_CFG_THRESHOLD: %u.", emCmd->Opt1);
+		debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+		// Only 48bits setted
+		cfg->Threshold = (ULLONG_MAX - emCmd->Opt1) & 0x0000FFFFFFFFFFFF;
+
+		setFlag(F_EM_THRESHOLD, core);
+		break;
+
+	// #########################################################################
+	// 3) Configure Collect Millis
+	case EM_CFG_COLLECT_MILLI:
+#if EMS_DEBUG > 0 //--------------------
+		sprintf(dbgMsg, "[EXC] EM_CFG_COLLECT_MILLI: %u.", emCmd->Opt1);
+		debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+		cfg->Collector_millis.QuadPart = emCmd->Opt1;
+
+		setFlag(F_EM_COLLECT_MILLI, core);
+		break;
+	default:
+		sprintf(dbgMsg, "[EXC] %d is not a valid SUBTYPE.", emCmd->Subtype);
+		debug(dbgMsg);
+
+		return CHANGE_ME;
+	}
+
+	//to_buffer(I_CGF_SET);
+	return st;
+}
+
+
+NTSTATUS em_start(_In_ PTEM_CCFG cfg) {
+	NTSTATUS st = STATUS_SUCCESS;
+	NTSTATUS CHANGE_ME = STATUS_FAIL_CHECK;
+	UINT32 core = cfg->Core;
+	CHAR dbgMsg[128];
+
+	if (!checkFlag(F_EM_CONFIGURED, core)) {
+		debug("[!EXC] NOT CONFIGURED");
+		return CHANGE_ME;
+	}
+
+	// Install hook before start Thread
+	if (!checkFlag(F_EM_HOOK_INSTALLED, core)) {
+		hook_handler(core);
+	}
+
+#if EMS_DEBUG >= 0 //-------------------
+	sprintf(dbgMsg, "[EXC] Activating PEBS in %dth core.", core);
+	debug(dbgMsg);
+#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+	if (checkFlag(F_EM_PEBS_ACTIVE, core)) {
+		sprintf(dbgMsg, "[!EXC] PEBS Core %d Already ACTIVE!", core);
+		debug(dbgMsg);
+		return CHANGE_ME;
+	}
+
+	st = PsCreateSystemThread(
+		&(cfg->Th_main),
+		GENERIC_ALL,
+		NULL, NULL, NULL,
+		StarterThread,
+		(VOID*)cfg->Core
+	);
+
+	if (NT_SUCCESS(st)) {
+		cfg->Interrupts = 0;
+		setFlag(F_EM_PEBS_ACTIVE, core);
+		st = PsCreateSystemThread(
+			&(cfg->Th_collector),
+			GENERIC_ALL,
+			NULL, NULL, NULL,
+			start_collector,
+			&(cfg->Core)
+		);
+
+		if (!NT_SUCCESS(st)) {
+			debug("[!EXC] Failed to create collector thread!");
+			//unhook_handler();
 		}
 	}
+
+	//to_buffer(I_START);
+	return st;
+}
+
+
+NTSTATUS em_stop(_In_ UINT32 core) {
+	NTSTATUS st = STATUS_SUCCESS;
+	NTSTATUS CHANGE_ME = STATUS_FAIL_CHECK;  // TODO: Return better code error
+	CHAR dbgMsg[128];
+
+	if (!checkFlag(F_EM_PEBS_ACTIVE, core)) {
+		return CHANGE_ME;
+	}
+
+	sprintf(dbgMsg, "[EXC] Deactivating PEBS in core %d.", core);
+	debug(dbgMsg);
+	stop_pebs(core);
 
 	return st;
 }
 
 
-NTSTATUS execute(_In_ CHAR cmd[EMS_BUFFER_MAX_LENGHT], _In_ UINT16 datasize) {
-	NTSTATUS st = STATUS_SUCCESS, CHANGE_ME = STATUS_FAIL_CHECK;
-	TEM_CMD emCmd;
-	CHAR dbgMsg[64];
+NTSTATUS execute(_In_ PTEM_CMD emCmd) {
+	NTSTATUS st = STATUS_FAIL_CHECK;;
 
-	st = _unpack(cmd, &emCmd, datasize);
-	if (!NT_SUCCESS(st)) {
-		return st;
+	for (UINT32 core = 0; core < CORE_QTD; core++)
+	{
+		if (!(emCmd->Cores & (1u << core))) {
+			continue;
+		}
+
+		if (emCmd->Type == EM_CMD_CFG) {
+			st = em_configure(emCmd, &(CCFG[core]));
+
+		} else if (emCmd->Type == EM_CMD_START) {
+			st = em_start(&(CCFG[core]));
+
+		} else if (emCmd->Type == EM_CMD_STOP) {
+			st = em_stop(core);
+		}
+
+		if (st != STATUS_SUCCESS) {
+			debug("Error while executing commands.");
+			return st;
+		}
 	}
-
-	if (emCmd.Type == EM_CMD_CFG) {
-		// ############################################################
-		// ### COMMAND CHANGE #########################################
-#if EMS_DEBUG > 0 //-------------------------------------------------------------------
-		debug("[EXC] EM_CFG detected.");
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-		if (checkFlag(F_EM_PEBS_ACTIVE)) {
-			debug("[!EXC] CANNOT change Event while PEBS active.");
-			return CHANGE_ME;
-		}
-		switch (emCmd.Event) {
-		case EM_CFG_EVT:
-#if EMS_DEBUG > 0 //-------------------------------------------------------------------
-			sprintf(dbgMsg, "[EXC] EM_CFG_EVT: %u.", emCmd.Opt1);
-			debug(dbgMsg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-			CFG_EVENT.Code = emCmd.Opt1;
-			if (!getPEBSEvt(&CFG_EVENT)) {
-				CFG_EVENT.Code = CFG_INVALID_EVENT_CODE;
-				CFG_EVENT.Event = _PE_INVALID_EVENT;
-				return CHANGE_ME;
-			}
-
-			setFlag(F_EM_EVENT);
-			break;
-		case EM_CFG_COLLECT_MAX:
-#if EMS_DEBUG > 0 //-------------------------------------------------------------------
-			sprintf(dbgMsg, "[EXC] EM_CFG_COLLECT_MAX: %u.", emCmd.Opt1);
-			debug(dbgMsg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-			CFG_COLLECT_MAX = emCmd.Opt1;
-
-			setFlag(F_EM_COLLECT_MAX);
-			break;
-		case EM_CFG_THRESHOLD:
-#if EMS_DEBUG > 0 //-------------------------------------------------------------------
-			sprintf(dbgMsg, "[EXC] EM_CFG_THRESHOLD: %u.", emCmd.Opt1);
-			debug(dbgMsg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-			// Only 48bits setted
-			CFG_THRESHOLD = (ULLONG_MAX - emCmd.Opt1) & 0x0000FFFFFFFFFFFF;
-
-			setFlag(F_EM_THRESHOLD);
-			break;
-		case EM_CFG_COLLECT_MILLI:
-#if EMS_DEBUG > 0 //-------------------------------------------------------------------
-			sprintf(dbgMsg, "[EXC] EM_CFG_COLLECT_MILLI: %u.", emCmd.Opt1);
-			debug(dbgMsg);
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-			CFG_COLLECT_MILLI.QuadPart = emCmd.Opt1;
-
-			setFlag(F_EM_COLLECT_MILLI);
-			break;
-		default:
-			sprintf(dbgMsg, "[EXC] %d is not a valid SUBTYPE.", emCmd.Event);
-			debug(dbgMsg);
-
-			return CHANGE_ME;
-		}
-		to_buffer(I_CGF_SET);
-
-	}
-	else if (emCmd.Type == EM_CMD_START) {
-		// ############################################################
-		// ### COMMAND START ##########################################
-		//to_buffer(I_START);
-		if (checkFlag(F_EM_PEBS_ACTIVE)) {
-			// TODO: Return better code error
-			debug("[!EXC] PEBS Already ACTIVE!");
-			return CHANGE_ME;
-		}
-
-		if (!checkFlag(F_EM_CONFIGURED)) {
-			debug("[!EXC] NOT CONFIGURED");
-			return CHANGE_ME;
-		}
-		UINT32 core;
-		
-		// Install hook before start Thread
-		hook_handler();
-
-		// TODO: Apply mask to enable multiple cores
-		if ((emCmd.Event & 1) == 1) {
-			// Core 0
-#if EMS_DEBUG > 0 //-------------------------------------------------------------------
-			debug("[EXC] Activating PEBS in 1th core.");
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			core = 0;
-
-			st = PsCreateSystemThread(&thandle[core], GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)core);
-
-			if (NT_SUCCESS(st)) {
-				INTERRUPTS[core] = 0;
-				setFlag(F_EM_PEBS_ACTIVE);
-				st = PsCreateSystemThread(&thandleCollector[core], GENERIC_ALL, NULL, NULL, NULL, start_collector, &core);
-				if (!NT_SUCCESS(st)) {
-					debug("[!EXC] Failed to create collector thread!");
-					unhook_handler();
-				}
-			}
-
-		}
-
-		if ((emCmd.Event & 2) == 2) {
-			// Core 1
-#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-			debug("[EXC] Activating PEBS in 2th core.");
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			core = 1;
-
-			st = PsCreateSystemThread(&thandle[core], GENERIC_ALL, NULL, NULL, NULL, StarterThread, (VOID*)core);
-
-			if (NT_SUCCESS(st)) {
-				INTERRUPTS[core] = 0;
-				setFlag(F_EM_PEBS_ACTIVE);
-				st = PsCreateSystemThread(&thandleCollector[core], GENERIC_ALL, NULL, NULL, NULL, start_collector, &core);
-				if (!NT_SUCCESS(st)) {
-					debug("[!EXC] Failed to create collector thread!");
-					unhook_handler();
-				}
-			}
-		}
-
-		if ((emCmd.Event & 4) == 4) {
-			// Core 2
-#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-			debug("[EXC] Activating PEBS in 3th core.");
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			core = 2;
-		}
-
-		if ((emCmd.Event & 8) == 8) {
-			// Core 3
-#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-			debug("[EXC] Activating PEBS in 4th core.");
-#endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			core = 3;
-		}
-
-		if (!checkFlag(F_EM_PEBS_ACTIVE)) {
-			sprintf(dbgMsg, "[EXC] %d is not a valid Start Configuration.", emCmd.Event);
-			debug(dbgMsg);
-		}
-		else {
-			to_buffer(I_ENABLE);
-		}
-
-	}
-	else if (emCmd.Type == EM_CMD_STOP) {
-		// ############################################################
-		// ### COMMAND STOP ###########################################
-		if (!checkFlag(F_EM_PEBS_ACTIVE)) {
-			// TODO: Return better code error
-			return CHANGE_ME;
-		}
-
-		//to_buffer(I_STOP);
-		switch (emCmd.Event) {
-		case EM_STCFG_CORE0:
-			debug("[EXC] Deactivating PEBS in core 0.");
-			stop_pebs(0);
-			break;
-
-		case EM_STCFG_CORE1:
-			debug("[EXC] Deactivating PEBS in core 1.");
-			stop_pebs(1);
-			break;
-
-		default:
-			sprintf(dbgMsg, "[EXC] %d is not a valid Stop Configuration.", emCmd.Event);
-			debug(dbgMsg);
-			break;
-		}
-
-	}
-	else {
-		// Error
-		sprintf(dbgMsg, "[EXC] %d is not a valid CMD.", emCmd.Type);
-		debug(dbgMsg);
-	}
-
 	return st;
 }
 
@@ -365,8 +306,8 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	UNREFERENCED_PARAMETER(ServiceContext);
 	ULONG core;
 	/* identify current core */
-	//core = KeGetCurrentProcessorNumber();
-	core = 0;  // TODO: Change to dynamic
+	core = KeGetCurrentProcessorNumber();
+	//core = 0;  // TODO: Change to dynamic
 
 	LARGE_INTEGER pa;
 	UINT32* APIC;
@@ -396,10 +337,10 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 	UINT64 pmc0, perf_ctr0, perf_global_status;
 	PTDS_BASE tmp;
 
-	sprintf(_msg, "----- [PMI] %d -----", INTERRUPTS);
+	sprintf(_msg, "----- [PMI] %d -----", CCFG[core].Interrupts);
 	debug(_msg);
 
-	sprintf(_msg, "[PMI]IA32_PERF_GLOBAL_ST: %lld", (DS_BASE->PEBS_BUFFER_BASE+INTERRUPTS)->IA32_PERF_GLOBAL_ST);
+	sprintf(_msg, "[PMI]IA32_PERF_GLOBAL_ST: %lld", DS_BASE->PEBS_BUFFER_BASE->IA32_PERF_GLOBAL_ST);
 	debug(_msg);
 #else //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	//char msg_bfr[BFR_SIZE];
@@ -410,14 +351,14 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 
 	// Increment interrupt counter
 	KIRQL old;
-	ExAcquireSpinLock(&LOCK_INTERRUPT[core], &old);
-	INTERRUPTS[0]++;
-	KeReleaseSpinLock(&LOCK_INTERRUPT[core], old);
+	ExAcquireSpinLock(&(CCFG[core].Lock_interrupts), &old);
+	CCFG[core].Interrupts++;
+	KeReleaseSpinLock(&(CCFG[core].Lock_interrupts), old);
 
 	//bfr_tick();			// IO data
 
 	// Re-enable PEBS
-	if (INTERRUPTS[core] < EM_SAFE_INTERRUPT_LIMIT) {
+	if (CCFG[core].Interrupts < EM_SAFE_INTERRUPT_LIMIT) {
 		//DS_BASE->PEBS_BUFFER_BASE = PEBS_BUFFER;	// Theoretically not necessary
 
 #ifdef DEBUG_DEV //--------------------------------------------------------------------
@@ -452,7 +393,7 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 		//DS_BASE->PEBS_INDEX = DS_BASE->PEBS_BUFFER_BASE;	// Reset index
 
 		// --+-- Enable PEBS --+--
-		__writemsr(MSR_IA32_PERFCTR0, CFG_THRESHOLD);
+		__writemsr(MSR_IA32_PERFCTR0, CCFG[core].Threshold);
 		__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
 		__writemsr(MSR_IA32_GLOBAL_CTRL, ENABLE_PEBS);
 #ifdef DEBUG_DEV //--------------------------------------------------------------------
@@ -490,14 +431,10 @@ VOID PMI(__in struct _KINTERRUPT *Interrupt, __in PVOID ServiceContext) {
 
 }
 
-// Hook Handles
-TFUNC_POINTER perfmon_hook;
-PVOID restore_hook = NULL;
-
 /*
 	Install PMI
 */
-VOID hook_handler() {
+VOID hook_handler(UINT32 core) {
 	NTSTATUS st;
 	/*
 	NTSTATUS HalSetSystemInformation(
@@ -506,29 +443,31 @@ VOID hook_handler() {
 		_Out_	PVOID						Buffer
 	);
 	*/
-	perfmon_hook.Function = PMI;
-
+	CCFG[core].Perfmon_hook.Function = PMI;
+	
 	st = HalSetSystemInformation(
 		HalProfileSourceInterruptHandler,
 		sizeof(PVOID*),
-		&perfmon_hook.Pointer
+		&(CCFG[core].Perfmon_hook.Pointer)
 	);
 
 	//char msg[126];
 	//sprintf(msg, "HOOK_HANDLER: ST:%X. F:%p", st, perfmon_hook.Pointer);
 	//debug(msg);
+	setFlag(F_EM_HOOK_INSTALLED, core);
 }
 
 /*
 	Uninstall PMI
 */
-VOID unhook_handler() {
+VOID unhook_handler(UINT32 core) {
 	NTSTATUS st;
 	st = HalSetSystemInformation(
 		HalProfileSourceInterruptHandler,
 		sizeof(PVOID*),
-		&restore_hook
+		&(CCFG[core].Restore_hook)
 	);
+	clearFlag(F_EM_HOOK_INSTALLED, core);
 }
 
 
@@ -544,32 +483,33 @@ VOID thread_attach_to_core(uintptr_t id) {
 	KeSetSystemAffinityThread(mask);
 }
 
-VOID fill_ds_with_buffer(PTDS_BASE ds_base, PTPEBS_BUFFER pebs_buffer) {
-	ds_base->PEBS_BUFFER_BASE = pebs_buffer;
-	ds_base->PEBS_INDEX = pebs_buffer;
+VOID fill_ds_with_buffer(PTEM_CCFG cfg) {
+
+	cfg->DS_base->PEBS_BUFFER_BASE = cfg->PEBS_buffer;
+	cfg->DS_base->PEBS_INDEX = cfg->PEBS_buffer;
 #ifdef DEBUG_DEV
-	ds_base->PEBS_MAXIMUM = pebs_buffer + MAX_INTERRUPTS;
-	ds_base->PEBS_THRESHOLD = pebs_buffer + 2; // TODO: adjust
+	cfg->DS_base->PEBS_MAXIMUM = cfg->PEBS_buffer + MAX_INTERRUPTS;
+	cfg->DS_base->PEBS_THRESHOLD = cfg->PEBS_buffer + 2; // TODO: adjust
 #else
-	ds_base->PEBS_MAXIMUM = pebs_buffer + 1;
-	ds_base->PEBS_THRESHOLD = pebs_buffer;	// Inactive, I think..
+	cfg->DS_base->PEBS_MAXIMUM = cfg->PEBS_buffer + 1;
+	cfg->DS_base->PEBS_THRESHOLD = cfg->PEBS_buffer;	// Inactive, I think..
 #endif
-	ds_base->PEBS_CTR0_RST = CFG_THRESHOLD;
+	cfg->DS_base->PEBS_CTR0_RST = cfg->Threshold;  // TODO: Make multi-core friendly
 #ifdef NEHALEM_NEW_FIELDS
-	ds_base->PEBS_CTR1_RST = CFG_THRESHOLD;
-	ds_base->PEBS_CTR2_RST = CFG_THRESHOLD;
-	ds_base->PEBS_CTR3_RST = CFG_THRESHOLD;
+	cfg->DS_base->PEBS_CTR1_RST = cfg->Threshold;
+	cfg->DS_base->PEBS_CTR2_RST = cfg->Threshold;
+	cfg->DS_base->PEBS_CTR3_RST = cfg->Threshold;
 #endif
 
 #ifdef DEBUG_DEV
 	char _msg[128];
 	sprintf(_msg, "SIZEOF TPEBS_BUFFER: %Id", sizeof(TPEBS_BUFFER));
 	debug(_msg);
-	sprintf(_msg, "DS_BASE  : %p", DS_BASE->PEBS_BUFFER_BASE);
+	sprintf(_msg, "DS_BASE  : %p", cfg->DS_base->PEBS_BUFFER_BASE);
 	debug(_msg);
-	sprintf(_msg, "PEBS_TRHD: %p", ds_base->PEBS_THRESHOLD);
+	sprintf(_msg, "PEBS_TRHD: %p", cfg->DS_base->PEBS_THRESHOLD);
 	debug(_msg);
-	sprintf(_msg, "PEBS_CTR0_RST: %llx", ds_base->PEBS_CTR0_RST);
+	sprintf(_msg, "PEBS_CTR0_RST: %llx", cfg->DS_base->PEBS_CTR0_RST);
 	debug(_msg);
 #endif
 }
@@ -585,11 +525,13 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	thread_attach_to_core(core);
 
 	// Allocate structs and buffers
-	DS_BASE = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), 'DSB');
-	PEBS_BUFFER = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CFG_COLLECT_MAX * sizeof(TPEBS_BUFFER), 'PBF');
+	ULONG tagds = TAG_PREFIX_DS_BASE | (ULONG) core;
+	ULONG tagbuffer = TAG_PREFIX_PEBS_BUFFER | (ULONG) core;
 
+	CCFG[core].DS_base = (PTDS_BASE)ExAllocatePoolWithTag(NonPagedPool, sizeof(TDS_BASE), tagds);
+	CCFG[core].PEBS_buffer = (PTPEBS_BUFFER)ExAllocatePoolWithTag(NonPagedPool, CCFG[core].Collector_max * sizeof(TPEBS_BUFFER), tagbuffer);
 
-	fill_ds_with_buffer(DS_BASE, PEBS_BUFFER);
+	fill_ds_with_buffer(&(CCFG[core]));
 	
 	pa.QuadPart = PERF_COUNTER_APIC;
 	/*
@@ -603,14 +545,14 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	*APIC = ORIGINAL_APIC_VALUE;
 	MmUnmapIoSpace(APIC, sizeof(UINT32));
 
-	__writemsr(MSR_DS_AREA, (UINT_PTR)DS_BASE);
+	__writemsr(MSR_DS_AREA, (UINT_PTR)CCFG[core].DS_base);
 
 	// --+-- Enable mechanism --+--
 	// Disable PEBS to set up
 	__writemsr(MSR_IA32_GLOBAL_CTRL, DISABLE_PEBS);
 	
 	// Set threshold (counter) and events
-	__writemsr(MSR_IA32_PERFCTR0, CFG_THRESHOLD);
+	__writemsr(MSR_IA32_PERFCTR0, CCFG[core].Threshold);
 
 #ifdef DEBUG_DEV
 	// IA32_PMC0 = 0
@@ -623,16 +565,18 @@ VOID StarterThread(_In_ PVOID StartContext) {
 	debug(_msg);
 #endif
 	//__writemsr(MSR_IA32_EVNTSEL0, PEBS_EVENT | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
-	__writemsr(MSR_IA32_EVNTSEL0, CFG_EVENT.Event | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
+	__writemsr(MSR_IA32_EVNTSEL0, CCFG[core].Event_map.Event | EVTSEL_EN | EVTSEL_USR | EVTSEL_INT);
 
 	// Enable PEBS
 	__writemsr(MSR_IA32_PEBS_ENABLE, ENABLE_PEBS);
 	__writemsr(MSR_IA32_GLOBAL_CTRL, ENABLE_PEBS);
-#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-	debug("PEBS setado");
+#if EMS_DEBUG >= 0 //------------------------------------------------------------------
+	CHAR dbgMsg[128];
+	sprintf(dbgMsg, "[StarterThread] PEBS setted on core %lld", core);
+	debug(dbgMsg);
 #endif //------------------------------------------------------------------------------
-
 }
+
 
 VOID StopperThread(_In_ PVOID StartContext) {
 	//int core;
@@ -647,11 +591,16 @@ VOID StopperThread(_In_ PVOID StartContext) {
 	__writemsr(MSR_IA32_GLOBAL_CTRL, DISABLE_PEBS);
 
 	// Free allocated memory
-	ExFreePoolWithTag(PEBS_BUFFER, 'PBF'); // Buffer
-	ExFreePoolWithTag(DS_BASE, 'DSB');	// Struct
+	ULONG tagds = TAG_PREFIX_DS_BASE | (ULONG) core;
+	ULONG tagbuffer = TAG_PREFIX_PEBS_BUFFER | (ULONG) core;
+	
+	ExFreePoolWithTag(CCFG[core].PEBS_buffer, tagds);  // Buffer
+	ExFreePoolWithTag(CCFG[core].DS_base, tagbuffer);  // Struct
 
-#if EMS_DEBUG >= 0 //-------------------------------------------------------------------
-	debug("Thread stopped. Resources FREE");
+#if EMS_DEBUG >= 0 //------------------------------------------------------------------
+	CHAR dbgMsg[128];
+	sprintf(dbgMsg, "[StopperThread] Thread stopped on core %lld", core);
+	debug(dbgMsg);
 #endif //------------------------------------------------------------------------------
 }
 
@@ -721,6 +670,8 @@ BOOLEAN getPEBSEvt(PTPEBS_EVT_MAP evtMap) {
 		evtMap->Event = all_events[evtMap->Code];
 		return TRUE;
 	} else {
+		evtMap->Code = CFG_INVALID_EVENT_CODE;
+		evtMap->Event = _PE_INVALID_EVENT;
 		return FALSE;
 	}
 }

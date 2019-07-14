@@ -105,91 +105,107 @@ VOID bfr_tick(UINT32 in_samples[SAMPLE_MAX], _In_ UINT32 ticks, UINT32 core) {
 	}
 }
 
-INT get_samples(_Out_ CHAR out_samples[IO_MAX_OUT_BUFFER], UINT32 core) {
+INT get_samples(_Out_ CHAR out_samples[IO_MAX_OUT_BUFFER]) {
 	/*
 	Accessed by IO
 	*/
 	KIRQL old;
+	INT core;
+	BOOLEAN get_something = FALSE;
 #if BUFFER_DEBUG > 0 //----------------------------------------------------------------
 	CHAR _msg[128];
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-	switch (TAIL[core]) {
-	case 0 :	// ########## SAMPLE0 ##########
-		ExAcquireSpinLock(&LOCK_SAMPLES0[core], &old);
-		if (SAMPLES0[core].used) {
+	
+	sprintf(out_samples, "");
+	for (core = 0; core < CORE_QTD; core++) {
+		switch (TAIL[core]) {
+		case 0:	// ########## SAMPLE0 ##########
+			ExAcquireSpinLock(&LOCK_SAMPLES0[core], &old);
+			if (SAMPLES0[core].used) {
 #if BUFFER_DEBUG > 0 //----------------------------------------------------------------
-			sprintf(_msg, "[SMPL] ZRO: (%d, %d)", SAMPLES0[core].count[0], SAMPLES0[core].time);
-			debug(_msg);
+				sprintf(_msg, "[SMPL] ZRO: (%d, %d)", SAMPLES0[core].count[0], SAMPLES0[core].time);
+				debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-			SAMPLES0[core].used = FALSE;
+				SAMPLES0[core].used = FALSE;
 
-			sprintf(out_samples, "%u", SAMPLES0[core].count[0]);
-			for (size_t i = 1; i < SAMPLE_MAX; i++)
-			{
-				sprintf(out_samples, "%s %u", out_samples, SAMPLES0[core].count[i]);
+				sprintf(out_samples, "%s %u", out_samples, SAMPLES0[core].count[0]);
+				for (size_t i = 1; i < SAMPLE_MAX; i++)
+				{
+					sprintf(out_samples, "%s %u", out_samples, SAMPLES0[core].count[i]);
+				}
+
+				KeReleaseSpinLock(&LOCK_SAMPLES0[core], old);
+				TAIL[core]++;
+				get_something = TRUE;
+				// return 0;
 			}
+			else {
+				KeReleaseSpinLock(&LOCK_SAMPLES0[core], old);
+			}
+			break;
 
-			KeReleaseSpinLock(&LOCK_SAMPLES0[core], old);
-			TAIL[core]++;
-			return 0;
-		}
-		else {
-			KeReleaseSpinLock(&LOCK_SAMPLES0[core], old);
-		}
-		break;
-
-	case 1:	// ########## SAMPLE1 ##########
-		ExAcquireSpinLock(&LOCK_SAMPLES1[core], &old);
-		if (SAMPLES1[core].used) {
+		case 1:	// ########## SAMPLE1 ##########
+			ExAcquireSpinLock(&LOCK_SAMPLES1[core], &old);
+			if (SAMPLES1[core].used) {
 #if BUFFER_DEBUG > 0 //----------------------------------------------------------------
-			sprintf(_msg, "[SMPL] ONE: (%d, %d)", SAMPLES1[core].count[0], SAMPLES1[core].time);
-			debug(_msg);
+				sprintf(_msg, "[SMPL] ONE: (%d, %d)", SAMPLES1[core].count[0], SAMPLES1[core].time);
+				debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			SAMPLES1[core].used = FALSE;
+				SAMPLES1[core].used = FALSE;
 
-			sprintf(out_samples, "%u", SAMPLES1[core].count[0]);
-			for (size_t i = 1; i < SAMPLE_MAX; i++)
-			{
-				sprintf(out_samples, "%s %u", out_samples, SAMPLES1[core].count[i]);
+				sprintf(out_samples, "%s %u", out_samples, SAMPLES1[core].count[0]);
+				for (size_t i = 1; i < SAMPLE_MAX; i++)
+				{
+					sprintf(out_samples, "%s %u", out_samples, SAMPLES1[core].count[i]);
+				}
+				KeReleaseSpinLock(&LOCK_SAMPLES1[core], old);
+				TAIL[core]++;
+				get_something = TRUE;
+				//return 0;
 			}
-			KeReleaseSpinLock(&LOCK_SAMPLES1[core], old);
-			TAIL[core]++;
-			return 0;
-		} else {
-			KeReleaseSpinLock(&LOCK_SAMPLES1[core], old);
-		}
-		break;
+			else {
+				KeReleaseSpinLock(&LOCK_SAMPLES1[core], old);
+			}
+			break;
 
-	case 2:	// ########## SAMPLE2 ##########
-		ExAcquireSpinLock(&LOCK_SAMPLES2[core], &old);
-		if (SAMPLES2[core].used) {
+		case 2:	// ########## SAMPLE2 ##########
+			ExAcquireSpinLock(&LOCK_SAMPLES2[core], &old);
+			if (SAMPLES2[core].used) {
 #if BUFFER_DEBUG > 0 //----------------------------------------------------------------
-			sprintf(_msg, "[SMPL] TWO: (%d, %d)", SAMPLES2[core].count[0], SAMPLES2[core].time);
-			debug(_msg);
+				sprintf(_msg, "[SMPL] TWO: (%d, %d)", SAMPLES2[core].count[0], SAMPLES2[core].time);
+				debug(_msg);
 #endif //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			SAMPLES2[core].used = FALSE;
+				SAMPLES2[core].used = FALSE;
 
-			sprintf(out_samples, "%u", SAMPLES2[core].count[0]);
-			for (size_t i = 1; i < SAMPLE_MAX; i++)
-			{
-				sprintf(out_samples, "%s %u", out_samples, SAMPLES2[core].count[i]);
+				sprintf(out_samples, "%s %u", out_samples, SAMPLES2[core].count[0]);
+				for (size_t i = 1; i < SAMPLE_MAX; i++)
+				{
+					sprintf(out_samples, "%s %u", out_samples, SAMPLES2[core].count[i]);
+				}
+
+				KeReleaseSpinLock(&LOCK_SAMPLES2[core], old);
+				TAIL[core] = 0;
+				get_something = TRUE;
+				//return 0;
 			}
-
-			KeReleaseSpinLock(&LOCK_SAMPLES2[core], old);
-			TAIL[core] = 0;
-			return 0;
-		} else {
-			KeReleaseSpinLock(&LOCK_SAMPLES2[core], old);
+			else {
+				KeReleaseSpinLock(&LOCK_SAMPLES2[core], old);
+			}
+			break;
+		default:
+			break;
 		}
-		break;
-	default:
-		break;
+		// separate core samples
+		sprintf(out_samples, "%s;", out_samples);
 	}
 
-	// count not modified
-	return 1;
+	if (get_something) {
+		return 0;
+	} else {
+		// count not modified
+		return 1;
+	}
 }
 
 

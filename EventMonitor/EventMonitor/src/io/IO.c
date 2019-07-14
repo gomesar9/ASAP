@@ -6,6 +6,7 @@
 
 #include "IO.h"
 #include "../dbg/debug.h"
+#include "../vld/validator.h"
 #include "../bfr/buffer.h"
 #include "../ems/EMS.h"
 
@@ -14,15 +15,15 @@
 NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
 	UNREFERENCED_PARAMETER(DeviceObject);
-	//TBTS_BUFFER bdata;
-	PVOID userbuffer;
-	PIO_STACK_LOCATION PIO_STACK_IRP;
-	UINT32 datasize, sizerequired= 0;
-	CHAR msg[EMS_BUFFER_MAX_LENGHT+32];
 	NTSTATUS NtStatus = STATUS_SUCCESS;
+	PIO_STACK_LOCATION PIO_STACK_IRP;
+	PVOID userbuffer;  // Buffer to store data from userland
+	CHAR msg[MAX_USER_INPUT_LEN+32];  // Buffer to debug msgs TODO: Use validation MAX
+	UINT32 datasize, sizerequired= 0;
+
 	// --+-- EMC use --+--
-	CHAR _cmdBfr[EMS_BUFFER_MAX_LENGHT + 1];
-	memset(_cmdBfr, '\0', EMS_BUFFER_MAX_LENGHT * sizeof(char)); // For sure..
+	CHAR _cmdBfr[MAX_USER_INPUT_LEN];
+	memset(_cmdBfr, '\0', EMS_BUFFER_MAX_LENGHT * sizeof(char));  // For sure..
 	
 	PIO_STACK_IRP = IoGetCurrentIrpStackLocation(Irp);
 
@@ -37,7 +38,8 @@ NTSTATUS Write(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 		sprintf(msg, "IO: msg received: %s (%u).", _cmdBfr, datasize);
 		debug(msg);
 
-		NtStatus = execute(_cmdBfr, (UINT16) datasize);
+		//NtStatus = execute(_cmdBfr, (UINT16) datasize);  // TODO: Call validation function
+		NtStatus = validate_input(_cmdBfr, datasize);
 		
 		Irp->IoStatus.Status = NtStatus;
 	} else {
@@ -76,8 +78,8 @@ NTSTATUS Read(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 	datasize = PIO_STACK_IRP->Parameters.Read.Length;
 
 	// --+-- BAND-AID --+--
-	UINT32 CORE_TMP = 0;
-	return_code = get_samples(samples, CORE_TMP);  // TODO: Get ANY or ALL core samples. Removing param
+	//UINT32 CORE_TMP = 0;
+	return_code = get_samples(samples);  // TODO: Get ANY or ALL core samples. Removing param
 	if (return_code != 0) {
 //		sprintf(buff, "%llu", samples);
 //	} else {
