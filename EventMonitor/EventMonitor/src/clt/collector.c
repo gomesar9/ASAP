@@ -42,15 +42,15 @@ NTSTATUS start_collector(_In_ PVOID StartContext) {
 		//accumulator += DATA[counter++];
 		counter++;
 		_collect_count++;
-#if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
-		sprintf(_msg, "[CLT] [%d]: %u..", counter, DATA[counter-1]);
+#if COLLECTOR_DEBUG > 1 //-------------------------------------------------------------
+		sprintf(_msg, "[CLT](C%d) [%d]: %u", core, counter, DATA[counter-1]);
 		debug(_msg);
 #endif
 
 		// Put into buffer
 		if (counter >= SAMPLE_MAX) {
-#if COLLECTOR_DEBUG > 0 //-------------------------------------------------------------
-			sprintf( _msg, "[CLT] %u, %u, %u, ...", DATA[0], DATA[1], DATA[2] );
+#if COLLECTOR_DEBUG > 1 //-------------------------------------------------------------
+			sprintf( _msg, "[CLT](%d) %u, %u, %u, ...", core, DATA[0], DATA[1], DATA[2] );
 			debug(_msg);
 #endif
 			bfr_tick(DATA, counter, core);

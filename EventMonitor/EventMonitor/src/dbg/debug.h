@@ -14,7 +14,7 @@
 #define BUFFER_DEBUG 9
 #define VLD_DEBUG 9
 #else
-#define COLLECTOR_DEBUG 0
+#define COLLECTOR_DEBUG 1
 #define DEVICE_DEBUG 0
 #define EMS_DEBUG 1
 #define EVENTMONITOR_DEBUG 0

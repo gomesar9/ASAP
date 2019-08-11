@@ -53,7 +53,7 @@ VOID bfr_tick(UINT32 in_samples[SAMPLE_MAX], _In_ UINT32 ticks, UINT32 core) {
 	case 0:	// ########## SAMPLE0 ##########
 		ExAcquireSpinLock(&LOCK_SAMPLES0[core], &old);
 		if ( ! SAMPLES0[core].used) {
-			RtlCopyMemory(SAMPLES0[core].count, in_samples, (ticks * sizeof(UINT32)));
+			RtlCopyMemory(&(SAMPLES0[core].count), &(in_samples[0]), (ticks * sizeof(UINT32)));
 
 			SAMPLES0[core].time = TIME_TICK++;
 			SAMPLES0[core].used = TRUE;
@@ -70,7 +70,7 @@ VOID bfr_tick(UINT32 in_samples[SAMPLE_MAX], _In_ UINT32 ticks, UINT32 core) {
 	case 1:	// ########## SAMPLE1 ##########
 		ExAcquireSpinLock(&LOCK_SAMPLES1[core], &old);
 		if ( ! SAMPLES1[core].used) {
-			RtlCopyMemory(SAMPLES1[core].count, in_samples, (ticks * sizeof(UINT32)));
+			RtlCopyMemory(&(SAMPLES1[core].count), in_samples, (ticks * sizeof(UINT32)));
 
 			SAMPLES1[core].time = TIME_TICK++;
 			SAMPLES1[core].used = TRUE;
@@ -87,7 +87,7 @@ VOID bfr_tick(UINT32 in_samples[SAMPLE_MAX], _In_ UINT32 ticks, UINT32 core) {
 	case 2:	// ########## SAMPLE2 ##########
 		ExAcquireSpinLock(&LOCK_SAMPLES2[core], &old);
 		if ( ! SAMPLES2[core].used) {
-			RtlCopyMemory(SAMPLES2[core].count, in_samples, (ticks * sizeof(UINT32)));
+			RtlCopyMemory(&(SAMPLES2[core].count), in_samples, (ticks * sizeof(UINT32)));
 
 			SAMPLES2[core].time = TIME_TICK++;
 			SAMPLES2[core].used = TRUE;
