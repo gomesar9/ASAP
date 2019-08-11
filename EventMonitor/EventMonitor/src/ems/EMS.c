@@ -52,9 +52,9 @@ BOOLEAN get_interrupts(_Out_ PUINT32 collect, UINT32 core) {
 	if (!checkFlag(F_EM_PEBS_ACTIVE, core)) {
 		return FALSE;
 	}
-			
 	ExAcquireSpinLock(&(CCFG[core].Lock_interrupts), &old);
-	*collect = CCFG[core].Interrupts;
+	RtlCopyMemory(collect, &(CCFG[core].Interrupts), sizeof(INT32));
+    // *collect = CCFG[core].Interrupts;
 	CCFG[core].Interrupts = 0;
 	KeReleaseSpinLock(&(CCFG[core].Lock_interrupts), old);
 	return TRUE;

@@ -7,11 +7,13 @@
 
 UINT32 check_cores_actives() {
 	UINT32 actives = 0;
-	CHAR dbgmsg[128];
 
 	for (UINT32 core=0; core < CORE_QTD; core++) {
+#if VLD_DEBUG > 0 //------------------------------------------------------------
+		CHAR dbgmsg[128];
 		sprintf(dbgmsg, "[VLD] Core %d: Flags: %d AND %d.", core, CCFG[core].Flags, F_EM_PEBS_ACTIVE);
 		debug(dbgmsg);
+#endif
 		if (checkFlag(F_EM_PEBS_ACTIVE, core)) {
 			actives |= 1u << core;
 		}
